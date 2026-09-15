@@ -1,0 +1,17 @@
+{
+  "scenario_id": "regional-null-001",
+  "question": "Why did reported revenue decrease yesterday?",
+  "expected_root_cause": "A customer region transformation regression excluded valid transactions from revenue reporting",
+  "expected_root_cause_chain": [
+    "Deployment changed the customer region transformation",
+    "Legacy region values mapped to null",
+    "Regional revenue filtered null regions",
+    "Reported revenue decreased"
+  ],
+  "expected_supported_hypotheses": ["H4"],
+  "expected_rejected_hypotheses": ["H1", "H2", "H3"],
+  "expected_business_impact": {
+    "understatement": 48000,
+    "unit": "USD"
+  }
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InsightIQ</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; background: #08111f; color: #e7eef9; }
+    main { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+    .eyebrow { color: #61d3ba; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+    h1 { font-size: clamp(40px, 7vw, 72px); margin: 8px 0; line-height: 1; }
+    .tagline { color: #9eb0ca; font-size: 20px; margin-bottom: 32px; }
+    .panel { background: #101d30; border: 1px solid #223451; border-radius: 16px; padding: 20px; margin-top: 20px; }
+    form { display: flex; gap: 12px; }
+    input { flex: 1; background: #08111f; color: white; border: 1px solid #355073; border-radius: 10px; padding: 14px; font-size: 16px; }
+    button { background: #61d3ba; color: #07111c; border: 0; border-radius: 10px; padding: 0 22px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .metric { font-size: 30px; font-weight: 750; color: #61d3ba; }
+    .muted { color: #9eb0ca; }
+    .chain li { margin: 14px 0; padding-left: 6px; }
+    .evidence { border-left: 3px solid #61d3ba; padding: 8px 12px; margin: 10px 0; background: #0b1727; }
+    .badge { display: inline-block; border-radius: 999px; padding: 5px 10px; background: #1d3651; font-size: 12px; margin-right: 6px; }
+    .error { color: #ff9c9c; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Autonomous Business Investigation</div>
+  <h1>InsightIQ</h1>
+  <p class="tagline">Don't just detect what changed. Investigate why.</p>
+  <section class="panel">
+    <form id="form">
+      <input id="question" value="Why did reported revenue decrease yesterday?" aria-label="Investigation question">
+      <button id="run">Investigate</button>
+    </form>
+    <p id="status" class="muted">Facts are earned. Conclusions are justified. Confidence is calculated.</p>
+  </section>
+  <div id="result" hidden>
+    <section class="grid">
+      <div class="panel"><div class="muted">Confidence</div><div id="confidence" class="metric"></div></div>
+      <div class="panel"><div class="muted">Tool calls</div><div id="calls" class="metric"></div></div>
+      <div class="panel"><div class="muted">Evidence gate</div><div id="gate" class="metric"></div></div>
+    </section>
+    <section class="panel"><h2>Conclusion</h2><p id="conclusion"></p></section>
+    <section class="panel"><h2>Root-cause chain</h2><ol id="chain" class="chain"></ol></section>
+    <section class="panel"><h2>Business impact</h2><p id="impact"></p></section>
+    <section class="panel"><h2>Evidence</h2><div id="evidence"></div></section>
+    <section class="panel"><h2>Recommendation</h2><p id="recommendation"></p></section>
+  </div>
+</main>
+<script>
+const form = document.querySelector('#form');
+const button = document.querySelector('#run');
+const status = document.querySelector('#status');
+const result = document.querySelector('#result');
+form.addEventListener('submit', async (event) => {
+  event.preventDefault(); button.disabled = true; result.hidden = true;
+  status.className = 'muted'; status.textContent = 'Investigating…';
+  try {
+    const response = await fetch('/investigations', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: document.querySelector('#question').value})});
+    if (!response.ok) throw new Error(await response.text());
+    const report = await response.json();
+    document.querySelector('#confidence').textContent = `${Math.round(report.confidence.overall * 100)}%`;
+    document.querySelector('#calls').textContent = report.statistics.tool_calls;
+    document.querySelector('#gate').textContent = report.evidence_gate.passed ? 'PASSED' : 'FAILED';
+    document.querySelector('#conclusion').textContent = report.conclusions[0];
+    document.querySelector('#chain').innerHTML = report.root_cause_chain.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    const impact = report.business_impact;
+    document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${impact.understatement.toLocaleString()} ${impact.unit} (${impact.understatement_percent}% understatement)`;
+    document.querySelector('#evidence').innerHTML = report.supporting_evidence.map(item => `<div class="evidence"><span class="badge">${escapeHtml(item.classification)}</span><span class="badge">${escapeHtml(item.tool_name)}</span><p>${escapeHtml(item.statement)}</p><small class="muted">${escapeHtml(item.source)} · ${escapeHtml(item.query_id)}</small></div>`).join('');
+    document.querySelector('#recommendation').textContent = report.recommendation;
+    result.hidden = false; status.textContent = `Investigation ${report.investigation_id} completed.`;
+  } catch (error) { status.className = 'error'; status.textContent = error.message; }
+  finally { button.disabled = false; }
+});
+function escapeHtml(value) { const node = document.createElement('div'); node.textContent = value ?? ''; return node.innerHTML; }
+</script>
+</body>
+</html>
