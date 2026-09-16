@@ -116,20 +116,26 @@ class Investigator:
         if proposal:
             state.root_cause_chain = proposal.root_cause_chain
             state.recommendation = proposal.recommendation
-        state.confidence = calculate_confidence(state.evidence)
+        target_hypothesis_id = proposal.hypothesis_id if proposal else None
+        state.confidence = calculate_confidence(
+            state.evidence,
+            state.root_cause_chain,
+            target_hypothesis_id,
+        )
         state.evidence_gate = evaluate_gate(
             state.evidence,
             state.confidence,
             self.evidence_store,
             state.root_cause_chain,
             state.business_impact,
+            target_hypothesis_id,
             self.confidence_threshold,
         )
 
         if proposal and state.evidence_gate.passed:
             state.conclusion = proposal.conclusion
             state.status = InvestigationStatus.COMPLETED
-            self._hypothesis(state, DATA_HYPOTHESIS).status = HypothesisStatus.SUPPORTED
+            self._hypothesis(state, proposal.hypothesis_id).status = HypothesisStatus.SUPPORTED
         else:
             state.conclusion = "Root cause not established"
             state.status = InvestigationStatus.INSUFFICIENT_EVIDENCE
@@ -155,60 +161,64 @@ class Investigator:
         supports: list[str] = []
         contradicts: list[str] = []
         strength = 0.9
-        if tool == "compare_periods" and result["metric"] == "traffic":
-            contradicts = ["H1"]
+        if tool == "compare_periods" and result["metric"] == "revenue":
+            if result["percent_change"] <= -10:
+                supports = ["H1", "H2", "H3", DATA_HYPOTHESIS]
+        elif tool == "compare_periods" and result["metric"] == "traffic":
+            (supports if result["percent_change"] <= -10 else contradicts).append("H1")
         elif tool == "compare_periods" and result["metric"] == "payment_failure_rate":
-            contradicts = ["H2"]
+            material_failure = (
+                result["current_value"] >= 0.05
+                and result["current_value"] >= result["baseline_value"] * 3
+            )
+            (supports if material_failure else contradicts).append("H2")
         elif tool == "segment_metric":
-            supports = ["H3", "H4"]
-        elif tool in {
-            "check_data_quality",
-            "get_deployments",
-            "inspect_schema_changes",
-            "get_dependencies",
-            "calculate_business_impact",
-        }:
+            supports = ["H3"]
+        elif tool == "check_data_quality":
+            (supports if result.get("anomaly") else contradicts).append(DATA_HYPOTHESIS)
+            strength = 1.0
+        elif tool == "get_deployments":
+            relevant = any(
+                item.get("service") == "customer-transform"
+                for item in result.get("deployments", [])
+            )
+            if relevant:
+                supports = [DATA_HYPOTHESIS]
+        elif tool == "inspect_schema_changes" and result.get("changes"):
             supports = [DATA_HYPOTHESIS]
-            strength = 1.0 if tool in {"check_data_quality", "get_dependencies"} else 0.9
+        elif tool == "get_dependencies" and result.get("filter_logic"):
+            supports = [DATA_HYPOTHESIS]
+            strength = 1.0
         return {"supports": supports, "contradicts": contradicts, "strength": strength}
 
     def _update_hypotheses(self, state: InvestigationState, tool: str) -> None:
-        if tool == "compare_periods" and state.tool_results[-1].result["metric"] == "traffic":
-            hypothesis = self._hypothesis(state, "H1")
+        evidence = state.evidence[-1]
+        for hypothesis_id in evidence.supports:
+            hypothesis = self._hypothesis(state, hypothesis_id)
+            if hypothesis.status != HypothesisStatus.REJECTED:
+                hypothesis.status = HypothesisStatus.INVESTIGATING
+            hypothesis.supporting_evidence.append(evidence.evidence_id)
+        for hypothesis_id in evidence.contradicts:
+            hypothesis = self._hypothesis(state, hypothesis_id)
             hypothesis.status = HypothesisStatus.REJECTED
-            hypothesis.rejection_reason = "Traffic remained at its historical baseline."
-            hypothesis.contradicting_evidence.append(state.evidence[-1].evidence_id)
-        elif (
-            tool == "compare_periods"
-            and state.tool_results[-1].result["metric"] == "payment_failure_rate"
-        ):
-            hypothesis = self._hypothesis(state, "H2")
-            hypothesis.status = HypothesisStatus.REJECTED
-            hypothesis.rejection_reason = (
-                "Payment failure rate remained near its historical baseline."
-            )
-            hypothesis.contradicting_evidence.append(state.evidence[-1].evidence_id)
-        elif tool == "segment_metric":
-            hypothesis = self._hypothesis(state, "H3")
-            hypothesis.status = HypothesisStatus.INVESTIGATING
-            hypothesis.supporting_evidence.append(state.evidence[-1].evidence_id)
-        elif tool in {
-            "check_data_quality",
-            "get_deployments",
-            "inspect_schema_changes",
-            "get_dependencies",
-            "calculate_business_impact",
-        }:
-            hypothesis = self._hypothesis(state, DATA_HYPOTHESIS)
-            hypothesis.status = HypothesisStatus.INVESTIGATING
-            hypothesis.supporting_evidence.append(state.evidence[-1].evidence_id)
-            if tool == "get_dependencies":
-                regional = self._hypothesis(state, "H3")
-                regional.status = HypothesisStatus.REJECTED
-                regional.rejection_reason = (
-                    "The regional pattern is explained by null-region filtering, "
-                    "not regional demand."
+            hypothesis.contradicting_evidence.append(evidence.evidence_id)
+            if hypothesis_id == "H1":
+                hypothesis.rejection_reason = "Traffic remained at its historical baseline."
+            elif hypothesis_id == "H2":
+                hypothesis.rejection_reason = (
+                    "Payment failure rate remained near its historical baseline."
                 )
+            elif hypothesis_id == DATA_HYPOTHESIS:
+                hypothesis.rejection_reason = (
+                    "The measured data-quality result contradicts a reporting regression."
+                )
+        if tool == "get_dependencies" and evidence.supports:
+            regional = self._hypothesis(state, "H3")
+            regional.status = HypothesisStatus.REJECTED
+            regional.rejection_reason = (
+                "The regional pattern is explained by null-region filtering, not regional demand."
+            )
+            regional.contradicting_evidence.append(evidence.evidence_id)
 
     @staticmethod
     def _hypothesis(state: InvestigationState, hypothesis_id: str) -> Hypothesis:
@@ -228,6 +238,7 @@ class Investigator:
             rejected_hypotheses=[
                 item for item in state.hypotheses if item.status == HypothesisStatus.REJECTED
             ],
+            evidence=state.evidence,
             supporting_evidence=[item for item in state.evidence if item.supports],
             conclusions=[state.conclusion or "Root cause not established"],
             root_cause_chain=state.root_cause_chain if state.evidence_gate.passed else [],

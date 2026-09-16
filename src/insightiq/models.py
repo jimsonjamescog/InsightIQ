@@ -68,7 +68,16 @@ class Evidence(BaseModel):
     timestamp: datetime = Field(default_factory=utc_now)
     supports: list[str] = Field(default_factory=list)
     contradicts: list[str] = Field(default_factory=list)
+    derived_from: list[str] = Field(default_factory=list)
     strength: float = Field(default=0.5, ge=0, le=1)
+
+
+class RootCauseLink(BaseModel):
+    link_id: str
+    sequence: int = Field(ge=1)
+    statement: str
+    classification: EvidenceClassification
+    evidence_ids: list[str] = Field(min_length=1)
 
 
 class ConfidenceBreakdown(BaseModel):
@@ -108,7 +117,7 @@ class InvestigationState(BaseModel):
     output_tokens: int = 0
     status: InvestigationStatus = InvestigationStatus.RUNNING
     conclusion: str | None = None
-    root_cause_chain: list[str] = Field(default_factory=list)
+    root_cause_chain: list[RootCauseLink] = Field(default_factory=list)
     business_impact: dict[str, Any] = Field(default_factory=dict)
     recommendation: str | None = None
     confidence: ConfidenceBreakdown | None = None
@@ -121,9 +130,10 @@ class InvestigationReport(BaseModel):
     observations: list[str]
     hypotheses: list[Hypothesis]
     rejected_hypotheses: list[Hypothesis]
+    evidence: list[Evidence]
     supporting_evidence: list[Evidence]
     conclusions: list[str]
-    root_cause_chain: list[str]
+    root_cause_chain: list[RootCauseLink]
     business_impact: dict[str, Any]
     confidence: ConfidenceBreakdown
     evidence_gate: EvidenceGateResult
@@ -159,8 +169,9 @@ class ToolRequest(BaseModel):
 
 
 class FinalProposal(BaseModel):
+    hypothesis_id: str
     conclusion: str
-    root_cause_chain: list[str]
+    root_cause_chain: list[RootCauseLink]
     recommendation: str
 
 

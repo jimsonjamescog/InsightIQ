@@ -11,6 +11,12 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
+def test_demo_exposes_rejected_hypotheses():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Rejected hypotheses" in response.text
+
+
 def test_create_and_retrieve_investigation():
     created = client.post(
         "/investigations",
@@ -20,6 +26,10 @@ def test_create_and_retrieve_investigation():
     report = created.json()
     investigation_id = report["investigation_id"]
     assert report["evidence_gate"]["passed"] is True
+    assert all(
+        link["classification"] in {"OBSERVED", "INFERRED"} and link["evidence_ids"]
+        for link in report["root_cause_chain"]
+    )
 
     assert client.get(f"/investigations/{investigation_id}").status_code == 200
     assert client.get(f"/investigations/{investigation_id}/evidence").status_code == 200

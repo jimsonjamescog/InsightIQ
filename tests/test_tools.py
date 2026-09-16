@@ -19,3 +19,11 @@ def test_tool_registry_rejects_unknown_tool():
 def test_tool_registry_validates_arguments():
     with pytest.raises(ValidationError):
         build_mock_registry().execute("compare_periods", {"metric": "secret_metric"})
+
+
+def test_business_impact_rejects_model_supplied_numbers():
+    with pytest.raises(ValidationError):
+        build_mock_registry().execute(
+            "calculate_business_impact",
+            {"metric": "revenue", "current_value": 1, "expected_value": 999999},
+        )

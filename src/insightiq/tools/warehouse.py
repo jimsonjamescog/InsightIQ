@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import duckdb
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from insightiq.models import ToolResult, new_id
 from insightiq.tools.registry import ToolDefinition, ToolRegistry
@@ -16,62 +16,64 @@ from insightiq.tools.registry import ToolDefinition, ToolRegistry
 MetricName = Literal["revenue", "orders", "traffic", "payment_failure_rate"]
 
 
-class KPIInput(BaseModel):
+class ToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class KPIInput(ToolInput):
     metric: MetricName
     period: str = "latest"
 
 
-class ComparePeriodsInput(BaseModel):
+class ComparePeriodsInput(ToolInput):
     metric: MetricName
     current_period: str = "latest"
     baseline_period: str = "previous_28_days"
 
 
-class DecomposeKPIInput(BaseModel):
+class DecomposeKPIInput(ToolInput):
     metric: Literal["revenue"] = "revenue"
     current_period: str = "latest"
     baseline_period: str = "previous_28_days"
 
 
-class SegmentMetricInput(BaseModel):
+class SegmentMetricInput(ToolInput):
     metric: Literal["revenue", "orders"]
     dimension: Literal["region", "channel", "product_category"]
     period: str = "latest"
 
 
-class DetectAnomalyInput(BaseModel):
+class DetectAnomalyInput(ToolInput):
     metric: MetricName
     window_days: int = Field(default=28, ge=7, le=90)
 
 
-class DataQualityInput(BaseModel):
+class DataQualityInput(ToolInput):
     field: Literal["customer_region", "customer_id", "order_total", "payment_status"]
     period: str = "latest"
 
 
-class TimeWindowInput(BaseModel):
+class TimeWindowInput(ToolInput):
     start: str = "incident_window"
     end: str = "latest"
 
 
-class SchemaChangeInput(BaseModel):
+class SchemaChangeInput(ToolInput):
     object_name: str = "customer_dimension"
     period: str = "last_7_days"
 
 
-class DependencyInput(BaseModel):
+class DependencyInput(ToolInput):
     object_name: str = "daily_revenue"
 
 
-class IncidentSearchInput(BaseModel):
+class IncidentSearchInput(ToolInput):
     query: str = Field(min_length=1, max_length=200)
     limit: int = Field(default=10, ge=1, le=50)
 
 
-class BusinessImpactInput(BaseModel):
+class BusinessImpactInput(ToolInput):
     metric: Literal["revenue"] = "revenue"
-    current_value: float = Field(ge=0)
-    expected_value: float = Field(ge=0)
 
 
 class QueryRunner(ABC):
@@ -387,15 +389,18 @@ class WarehouseToolProvider:
         )
 
     def calculate_business_impact(self, args: BusinessImpactInput) -> ToolResult:
-        difference = args.expected_value - args.current_value
-        percent = (difference / args.expected_value) * 100 if args.expected_value else 0.0
-        sql = "deterministic: expected_value - current_value"
+        sql = "SELECT metric_date, revenue FROM business.daily_revenue ORDER BY metric_date DESC"
+        rows = self.runner.query(sql)
+        current_value = float(rows[0]["revenue"])
+        expected_value = statistics.mean(float(row["revenue"]) for row in rows[1:29])
+        difference = expected_value - current_value
+        percent = (difference / expected_value) * 100 if expected_value else 0.0
         return self._result(
             "calculate_business_impact",
             {
                 "metric": args.metric,
-                "reported_value": args.current_value,
-                "expected_value": args.expected_value,
+                "reported_value": current_value,
+                "expected_value": expected_value,
                 "understatement": difference,
                 "understatement_percent": round(percent, 2),
                 "unit": "USD",

@@ -34,11 +34,7 @@ def test_all_de3_warehouse_tools_execute(tmp_path: Path):
         "inspect_schema_changes": {},
         "get_dependencies": {},
         "search_incidents": {"query": "payment"},
-        "calculate_business_impact": {
-            "metric": "revenue",
-            "current_value": 72000,
-            "expected_value": 120000,
-        },
+        "calculate_business_impact": {"metric": "revenue"},
     }
 
     assert set(inputs) == set(registry.names)

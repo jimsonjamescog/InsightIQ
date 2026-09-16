@@ -47,9 +47,18 @@ def build_graph(state: InvestigationState) -> GraphExport:
                 graph.add_edge(evidence.evidence_id, conclusion_id, type="JUSTIFIES")
 
         prior_id = conclusion_id
-        for index, link in enumerate(state.root_cause_chain):
-            link_id = f"cause:{state.investigation_id}:{index}"
-            graph.add_node(link_id, type="ROOT_CAUSE_LINK", label=link)
+        for link in state.root_cause_chain:
+            link_id = f"cause:{state.investigation_id}:{link.link_id}"
+            graph.add_node(
+                link_id,
+                type="ROOT_CAUSE_LINK",
+                label=link.statement,
+                classification=link.classification.value,
+                sequence=link.sequence,
+                evidence_ids=link.evidence_ids,
+            )
+            for evidence_id in link.evidence_ids:
+                graph.add_edge(evidence_id, link_id, type="SUPPORTS_LINK")
             graph.add_edge(link_id, prior_id, type="CAUSES")
             prior_id = link_id
 

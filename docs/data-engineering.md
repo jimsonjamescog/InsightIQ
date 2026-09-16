@@ -48,6 +48,18 @@ Reset the entire mystery reproducibly:
 insightiq-data reset
 ```
 
+The scenario builder also provides the negative-test worlds:
+
+| Scenario | Expected result |
+|---|---|
+| `missing_deployment` | Root cause not established |
+| `conflicting_evidence` | Root cause not established; H4 is rejected with supporting and contradicting evidence |
+| `payment_failure` | H2 is supported as the root cause |
+| `data_quality_no_deployment` | Root cause not established |
+| `insufficient_evidence` | Root cause not established |
+
+Select one with `insightiq-data reset --scenario <name>`.
+
 The evaluator alone reads `scenarios/ground_truth.json`. It is not loaded into DuckDB or Snowflake and is not registered as an agent tool.
 
 ## DE3 — Analytics and tooling
@@ -79,6 +91,20 @@ result
 error
 ```
 
+Business impact accepts only the metric name. Current and expected values are read from the warehouse, preventing the model from supplying invented calculation inputs.
+
+Each established causal link contains:
+
+```text
+link_id
+sequence
+statement
+classification: OBSERVED | INFERRED
+evidence_ids
+```
+
+The gate verifies every referenced evidence ID, blocks unresolved contradictions against the proposed hypothesis, and rejects incomplete causal sequences.
+
 The model never receives unrestricted SQL. User-controlled metric and dimension names are Pydantic literals, database identifiers are selected from internal allowlists, and query provenance is recorded before evidence can be accepted.
 
 ## Snowflake deployment
@@ -100,4 +126,4 @@ pytest --cov=insightiq --cov-report=term-missing
 python -m insightiq.evaluation.runner
 ```
 
-The warehouse integration test executes every DE3 tool against a newly built temporary database and then runs the complete investigator against it.
+The warehouse integration test executes every DE3 tool against a newly built temporary database and then runs the complete investigator against it. The investigation regression suite runs the base mystery ten times and independently tests every negative scenario.

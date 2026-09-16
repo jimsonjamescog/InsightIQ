@@ -25,6 +25,9 @@ The included scenario investigates a 40% reported-revenue drop caused by a deplo
 - Snowflake DDL, loader, and dbt transformation project
 - Operational metadata, realistic decoys, and resettable failure injection
 - Twelve typed analytics, quality, metadata, lineage, and impact tools
+- Typed observed/inferred causal links with link-level evidence references
+- Five negative scenario variants and ten-run investigation regression coverage
+- Rejected-hypothesis explanations in the demo UI
 - Unit and integration tests
 - Docker and GitHub Actions configuration
 
@@ -49,6 +52,16 @@ insightiq-data build
 insightiq-data validate
 insightiq-data profile
 insightiq-data reset
+```
+
+Run a trust/negative scenario with:
+
+```bash
+insightiq-data reset --scenario missing_deployment
+insightiq-data reset --scenario conflicting_evidence
+insightiq-data reset --scenario payment_failure
+insightiq-data reset --scenario data_quality_no_deployment
+insightiq-data reset --scenario insufficient_evidence
 ```
 
 For a real-world ingestion demonstration, the project selects [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail). After downloading its workbook, install the `real-data` extra and run `insightiq-data import-uci --source <workbook>`.
@@ -155,9 +168,12 @@ Then set `INSIGHTIQ_DATA_BACKEND=snowflake`. Keep metric names, dimensions, and 
 ## Trust rules
 
 - Facts come from tools; the model does not invent measurements.
+- Business-impact inputs are fetched by the tool from the warehouse, not supplied by the model.
 - Observed evidence must link to a recorded tool execution.
+- Every root-cause link is labeled `OBSERVED` or `INFERRED` and cites evidence IDs.
 - Inferences are labeled separately from observations.
 - Hypotheses require evidence to be supported or rejected.
+- Unresolved evidence against the proposed hypothesis blocks the evidence gate.
 - Confidence is calculated in code.
 - A failed evidence gate returns **Root cause not established**.
 - Hidden ground truth is evaluation-only.
@@ -166,5 +182,5 @@ Then set `INSIGHTIQ_DATA_BACKEND=snowflake`. Keep metric names, dimensions, and 
 
 - Investigations execute synchronously.
 - State is stored in memory.
-- The bundled scenario is deliberately controlled and compact.
+- The bundled scenarios are deliberately controlled and compact.
 - Snowflake requires your account, warehouse, role, and authentication configuration.

@@ -13,6 +13,8 @@ insightiq-data profile
 
 The default output is `data/insightiq.duckdb`, which is ignored by Git. The FastAPI application automatically creates it when `INSIGHTIQ_DATA_BACKEND=duckdb` and the file is missing.
 
+Use `--scenario` with `reset` or `build` to select `base`, `missing_deployment`, `conflicting_evidence`, `payment_failure`, `data_quality_no_deployment`, or `insufficient_evidence`.
+
 The generated source tables mirror the Snowflake schemas under `warehouse/snowflake`. Hidden ground truth is deliberately stored outside the warehouse in `scenarios/ground_truth.json`.
 
 ## Optional real-world source

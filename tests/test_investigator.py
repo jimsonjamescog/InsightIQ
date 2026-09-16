@@ -35,7 +35,7 @@ def test_graph_contains_provenance_and_conclusion():
     node_types = {node.type for node in graph.nodes}
     edge_types = {edge.type for edge in graph.edges}
     assert {"QUESTION", "HYPOTHESIS", "EVIDENCE", "TOOL_CALL", "CONCLUSION"} <= node_types
-    assert {"PRODUCED", "SUPPORTS", "CONTRADICTS", "JUSTIFIES"} <= edge_types
+    assert {"PRODUCED", "SUPPORTS", "CONTRADICTS", "JUSTIFIES", "SUPPORTS_LINK"} <= edge_types
 
 
 def test_step_limit_returns_insufficient_evidence():

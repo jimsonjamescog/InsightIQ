@@ -33,7 +33,7 @@ def build_provider():
 
 app = FastAPI(
     title="InsightIQ",
-    version="0.2.0",
+    version="0.3.0",
     description="Evidence-grounded autonomous business investigation agent",
 )
 

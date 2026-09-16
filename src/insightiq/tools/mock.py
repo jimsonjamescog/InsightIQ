@@ -2,47 +2,49 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 from insightiq.models import ToolResult, new_id
 from insightiq.tools.registry import ToolDefinition, ToolRegistry
 
 
-class ComparePeriodsInput(BaseModel):
+class ToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ComparePeriodsInput(ToolInput):
     metric: Literal["revenue", "orders", "traffic", "payment_failure_rate"]
     current_period: str = "yesterday"
     baseline_period: str = "previous_28_days"
 
 
-class SegmentMetricInput(BaseModel):
+class SegmentMetricInput(ToolInput):
     metric: Literal["revenue", "orders"]
     dimension: Literal["region", "channel", "product_category"]
     period: str = "yesterday"
 
 
-class DataQualityInput(BaseModel):
+class DataQualityInput(ToolInput):
     field: Literal["customer_region", "customer_id", "order_total", "payment_status"]
     period: str = "last_7_days"
 
 
-class TimeWindowInput(BaseModel):
+class TimeWindowInput(ToolInput):
     start: str = "yesterday"
     end: str = "today"
 
 
-class SchemaChangeInput(BaseModel):
+class SchemaChangeInput(ToolInput):
     object_name: str = "customer_dimension"
     period: str = "last_7_days"
 
 
-class DependencyInput(BaseModel):
+class DependencyInput(ToolInput):
     object_name: str = "daily_revenue"
 
 
-class BusinessImpactInput(BaseModel):
+class BusinessImpactInput(ToolInput):
     metric: Literal["revenue"] = "revenue"
-    current_value: float = Field(default=72000, ge=0)
-    expected_value: float = Field(default=120000, ge=0)
 
 
 SCENARIO: dict[str, Any] = {
@@ -212,14 +214,16 @@ def get_dependencies(args: DependencyInput) -> ToolResult:
 
 
 def calculate_business_impact(args: BusinessImpactInput) -> ToolResult:
-    difference = args.expected_value - args.current_value
-    percent = (difference / args.expected_value) * 100 if args.expected_value else 0
+    current_value = SCENARIO["periods"][args.metric]["current"]
+    expected_value = SCENARIO["periods"][args.metric]["baseline"]
+    difference = expected_value - current_value
+    percent = (difference / expected_value) * 100 if expected_value else 0
     return _result(
         "calculate_business_impact",
         {
             "metric": args.metric,
-            "reported_value": args.current_value,
-            "expected_value": args.expected_value,
+            "reported_value": current_value,
+            "expected_value": expected_value,
             "understatement": difference,
             "understatement_percent": round(percent, 2),
             "unit": "USD",

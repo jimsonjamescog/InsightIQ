@@ -55,8 +55,18 @@ def test_openai_provider_accepts_structured_finish_call():
         name="finish_investigation",
         arguments=json.dumps(
             {
+                "hypothesis_id": "H4",
                 "conclusion": "Supported conclusion",
-                "root_cause_chain": ["one", "two", "three", "four"],
+                "root_cause_chain": [
+                    {
+                        "link_id": f"cause-{index}",
+                        "sequence": index,
+                        "statement": statement,
+                        "classification": "OBSERVED" if index < 4 else "INFERRED",
+                        "evidence_ids": ["evidence-1"],
+                    }
+                    for index, statement in enumerate(["one", "two", "three", "four"], start=1)
+                ],
                 "recommendation": "Correct and backfill the transformation.",
             }
         ),
@@ -68,3 +78,4 @@ def test_openai_provider_accepts_structured_finish_call():
 
     assert decision.final_proposal is not None
     assert decision.final_proposal.conclusion == "Supported conclusion"
+    assert decision.final_proposal.root_cause_chain[3].classification == "INFERRED"

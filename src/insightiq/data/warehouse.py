@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 from pathlib import Path
 
 import duckdb
 
 HISTORY_START = "2026-06-17"
 INCIDENT_DATE = "2026-09-14"
+
+
+class ScenarioName(StrEnum):
+    BASE = "base"
+    MISSING_DEPLOYMENT = "missing_deployment"
+    CONFLICTING_EVIDENCE = "conflicting_evidence"
+    PAYMENT_FAILURE = "payment_failure"
+    DATA_QUALITY_NO_DEPLOYMENT = "data_quality_no_deployment"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
 @dataclass(frozen=True)
@@ -268,7 +278,137 @@ INSERT INTO operations.documents VALUES
 """
 
 
-def build_warehouse(path: str | Path, *, reset: bool = False) -> WarehouseProfile:
+REBUILD_ANALYTICS = """
+CREATE OR REPLACE TABLE business.daily_actual_revenue AS
+SELECT order_date AS metric_date, SUM(order_total)::DOUBLE AS revenue, COUNT(*) AS orders
+FROM business.fct_orders
+WHERE order_status = 'PAID'
+GROUP BY order_date;
+
+CREATE OR REPLACE TABLE business.daily_revenue AS
+SELECT order_date AS metric_date, SUM(order_total)::DOUBLE AS revenue, COUNT(*) AS orders
+FROM business.fct_orders
+WHERE order_status = 'PAID' AND customer_region IS NOT NULL
+GROUP BY order_date;
+
+CREATE OR REPLACE TABLE business.regional_revenue AS
+SELECT order_date AS metric_date, customer_region AS region,
+       SUM(order_total)::DOUBLE AS revenue, COUNT(*) AS orders
+FROM business.fct_orders
+WHERE order_status = 'PAID' AND customer_region IS NOT NULL
+GROUP BY order_date, customer_region;
+
+CREATE OR REPLACE TABLE business.daily_payment_metrics AS
+SELECT payment_date AS metric_date,
+       SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END)::DOUBLE
+           / COUNT(*) AS payment_failure_rate,
+       COUNT(*) AS payment_attempts
+FROM raw.payments
+GROUP BY payment_date;
+
+CREATE OR REPLACE TABLE quality.data_quality_metrics AS
+SELECT snapshot_date AS metric_date, 'customer_region' AS field_name,
+       SUM(CASE WHEN customer_region IS NULL THEN 1 ELSE 0 END)::DOUBLE / COUNT(*) AS null_rate,
+       COUNT(*) AS row_count
+FROM business.customer_dimension_snapshot
+GROUP BY snapshot_date
+UNION ALL
+SELECT DISTINCT order_date, 'customer_id', 0.0, 1000 FROM raw.orders
+UNION ALL
+SELECT DISTINCT order_date, 'order_total', 0.001, 1000 FROM raw.orders
+UNION ALL
+SELECT DISTINCT payment_date, 'payment_status', 0.0, 1000 FROM raw.payments;
+"""
+
+
+def _apply_scenario(connection, scenario: ScenarioName) -> None:
+    if scenario == ScenarioName.BASE:
+        return
+    if scenario == ScenarioName.MISSING_DEPLOYMENT:
+        connection.execute("DELETE FROM operations.deployments WHERE deployment_id = 'deploy-284'")
+        return
+    if scenario == ScenarioName.CONFLICTING_EVIDENCE:
+        connection.execute(
+            """
+            UPDATE quality.data_quality_metrics SET null_rate = 0.004
+            WHERE metric_date = DATE '2026-09-14' AND field_name = 'customer_region'
+            """
+        )
+        return
+    if scenario == ScenarioName.DATA_QUALITY_NO_DEPLOYMENT:
+        connection.execute("DELETE FROM operations.deployments WHERE deployment_id = 'deploy-284'")
+        connection.execute(
+            "DELETE FROM operations.schema_changes WHERE deployment_id = 'deploy-284'"
+        )
+        return
+    if scenario == ScenarioName.INSUFFICIENT_EVIDENCE:
+        connection.execute("DELETE FROM operations.deployments WHERE deployment_id = 'deploy-284'")
+        connection.execute(
+            "DELETE FROM operations.schema_changes WHERE deployment_id = 'deploy-284'"
+        )
+        connection.execute("DELETE FROM operations.data_dependencies")
+        connection.execute(
+            """
+            UPDATE quality.data_quality_metrics SET null_rate = 0.004
+            WHERE metric_date = DATE '2026-09-14' AND field_name = 'customer_region'
+            """
+        )
+        return
+    if scenario == ScenarioName.PAYMENT_FAILURE:
+        connection.execute(
+            """
+            UPDATE business.customer_dimension_snapshot
+            SET customer_region = CASE region_code
+                WHEN 'NA' THEN 'North America'
+                WHEN 'EU' THEN 'Europe'
+                WHEN 'APAC' THEN 'Asia Pacific'
+            END
+            WHERE snapshot_date = DATE '2026-09-14'
+            """
+        )
+        connection.execute(
+            """
+            UPDATE raw.orders SET order_status = 'PAYMENT_FAILED'
+            WHERE order_id IN (
+                SELECT order_id FROM raw.orders
+                WHERE order_date = DATE '2026-09-14'
+                ORDER BY order_id DESC LIMIT 40
+            )
+            """
+        )
+        connection.execute(
+            """
+            UPDATE raw.payments SET status = 'FAILED'
+            WHERE order_id IN (
+                SELECT order_id FROM raw.orders WHERE order_status = 'PAYMENT_FAILED'
+            )
+            """
+        )
+        connection.execute(
+            """
+            UPDATE business.fct_orders AS fact
+            SET order_status = source.order_status,
+                customer_region = snapshot.customer_region
+            FROM raw.orders AS source, business.customer_dimension_snapshot AS snapshot
+            WHERE fact.order_id = source.order_id
+              AND snapshot.customer_id = fact.customer_id
+              AND snapshot.snapshot_date = fact.order_date
+            """
+        )
+        connection.execute("DELETE FROM operations.deployments WHERE deployment_id = 'deploy-284'")
+        connection.execute(
+            "DELETE FROM operations.schema_changes WHERE deployment_id = 'deploy-284'"
+        )
+        connection.execute(REBUILD_ANALYTICS)
+
+
+def build_warehouse(
+    path: str | Path,
+    *,
+    reset: bool = False,
+    scenario: ScenarioName | str = ScenarioName.BASE,
+) -> WarehouseProfile:
+    scenario = ScenarioName(scenario)
     database_path = Path(path)
     database_path.parent.mkdir(parents=True, exist_ok=True)
     if reset and database_path.exists():
@@ -276,7 +416,8 @@ def build_warehouse(path: str | Path, *, reset: bool = False) -> WarehouseProfil
     with duckdb.connect(str(database_path)) as connection:
         connection.execute(DDL)
         connection.execute(OPERATIONS_DDL)
-    errors = validate_warehouse(database_path)
+        _apply_scenario(connection, scenario)
+    errors = validate_warehouse(database_path, scenario=scenario)
     if errors:
         raise RuntimeError("Warehouse validation failed: " + "; ".join(errors))
     return profile_warehouse(database_path)
@@ -302,17 +443,28 @@ def profile_warehouse(path: str | Path) -> WarehouseProfile:
     return WarehouseProfile(*row)
 
 
-def validate_warehouse(path: str | Path) -> list[str]:
+def validate_warehouse(
+    path: str | Path, scenario: ScenarioName | str = ScenarioName.BASE
+) -> list[str]:
+    scenario = ScenarioName(scenario)
     errors: list[str] = []
     profile = profile_warehouse(path)
     if profile.history_days != 90:
         errors.append(f"Expected 90 history days; got {profile.history_days}.")
     if profile.customers != 1000:
         errors.append(f"Expected 1000 customers; got {profile.customers}.")
-    if profile.incident_actual_revenue != 120000:
-        errors.append("Incident actual revenue must be 120000.")
+    expected_actual = 72000 if scenario == ScenarioName.PAYMENT_FAILURE else 120000
+    if profile.incident_actual_revenue != expected_actual:
+        errors.append(f"Incident actual revenue must be {expected_actual}.")
     if profile.incident_reported_revenue != 72000:
         errors.append("Incident reported revenue must be 72000.")
-    if round(profile.incident_region_null_rate, 3) != 0.631:
-        errors.append("Incident customer-region null rate must be 0.631.")
+    expected_null_rate = (
+        0.0
+        if scenario == ScenarioName.PAYMENT_FAILURE
+        else 0.004
+        if scenario in {ScenarioName.CONFLICTING_EVIDENCE, ScenarioName.INSUFFICIENT_EVIDENCE}
+        else 0.631
+    )
+    if round(profile.incident_region_null_rate, 3) != expected_null_rate:
+        errors.append(f"Incident customer-region null rate must be {expected_null_rate:.3f}.")
     return errors
