@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'INSIGHTIQ') }}"
+    schema: RAW
+    tables:
+      - name: customers
+      - name: products
+      - name: orders
+      - name: order_items
+      - name: web_traffic
+      - name: payments
+  - name: operations
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'INSIGHTIQ') }}"
+    schema: OPERATIONS
+    tables:
+      - name: deployments
+      - name: pipeline_runs
+      - name: schema_changes
+      - name: data_dependencies
+      - name: incidents
+      - name: documents

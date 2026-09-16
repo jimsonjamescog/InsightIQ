@@ -3,6 +3,7 @@ from __future__ import annotations
 from insightiq.models import Evidence, EvidenceClassification, ToolResult, new_id
 
 STATEMENT_BUILDERS = {
+    "get_kpi": lambda r: f"{r['metric']} is {r['value']} {r['unit']} for {r['period']}.",
     "compare_periods": lambda r: (
         f"{r['metric']} changed {r['percent_change']}%: "
         f"{r['baseline_value']} to {r['current_value']} {r['unit']}."
@@ -11,6 +12,13 @@ STATEMENT_BUILDERS = {
         f"{r['metric']} breakdown by {r['dimension']} shows: "
         + ", ".join(f"{s['segment']} {s['percent_change']}%" for s in r["segments"])
         + "."
+    ),
+    "decompose_kpi": lambda r: (
+        f"{r['metric']} decomposes into order-volume effect "
+        f"{r['effects']['order_volume']} and AOV effect {r['effects']['average_order_value']}."
+    ),
+    "detect_anomaly": lambda r: (
+        f"{r['metric']} anomaly={r['is_anomaly']} with z-score {r['z_score']}."
     ),
     "check_data_quality": lambda r: (
         f"{r['field']} null rate changed from {r['baseline_null_rate']:.1%} "
@@ -30,6 +38,9 @@ STATEMENT_BUILDERS = {
     "calculate_business_impact": lambda r: (
         f"Reported {r['metric']} is understated by {r['understatement']} {r['unit']} "
         f"({r['understatement_percent']}%)."
+    ),
+    "search_incidents": lambda r: (
+        f"Incident search for {r['query']} returned {len(r['incidents'])} result(s)."
     ),
 }
 

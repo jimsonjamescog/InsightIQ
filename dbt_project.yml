@@ -1,0 +1,19 @@
+name: insightiq
+version: "1.0.0"
+config-version: 2
+profile: insightiq
+model-paths: ["dbt/models"]
+test-paths: ["dbt/tests"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  insightiq:
+    staging:
+      +materialized: view
+      +schema: staging
+    business:
+      +materialized: table
+      +schema: business
+    quality:
+      +materialized: table
+      +schema: quality

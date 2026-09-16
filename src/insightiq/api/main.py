@@ -16,13 +16,13 @@ from insightiq.models import (
     InvestigationState,
 )
 from insightiq.storage import InMemoryRepository, InvestigationRecord
-from insightiq.tools import build_mock_registry
+from insightiq.tools.factory import build_registry
 from insightiq.trust.graph import build_graph
 
 configure_logging()
 settings = get_settings()
 repository = InMemoryRepository()
-registry = build_mock_registry()
+registry = build_registry(settings)
 
 
 def build_provider():
@@ -33,7 +33,7 @@ def build_provider():
 
 app = FastAPI(
     title="InsightIQ",
-    version="0.1.0",
+    version="0.2.0",
     description="Evidence-grounded autonomous business investigation agent",
 )
 
@@ -56,6 +56,7 @@ def health() -> dict:
         "status": "ok",
         "agent_mode": settings.agent_mode,
         "model": settings.openai_model if settings.agent_mode == "openai" else None,
+        "data_backend": settings.data_backend,
         "tools": registry.names,
     }
 

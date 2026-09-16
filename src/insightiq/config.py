@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,9 @@ class Settings(BaseSettings):
     max_steps: int = Field(default=15, ge=1, le=50)
     max_tool_calls: int = Field(default=12, ge=1, le=50)
     confidence_threshold: float = Field(default=0.75, ge=0, le=1)
+    data_backend: str = Field(default="duckdb", pattern="^(duckdb|mock|snowflake)$")
+    database_path: Path = Path("data/insightiq.duckdb")
+    auto_bootstrap_data: bool = True
 
 
 @lru_cache

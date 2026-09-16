@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        tests: [not_null, unique]
+      - name: region_code
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['NA', 'EU', 'APAC']
+  - name: stg_orders
+    columns:
+      - name: order_id
+        tests: [not_null, unique]
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: order_total
+        tests: [not_null]
+  - name: fct_orders
+    columns:
+      - name: order_id
+        tests: [not_null, unique]
+  - name: daily_revenue
+    columns:
+      - name: metric_date
+        tests: [not_null, unique]
+      - name: revenue
+        tests: [not_null]

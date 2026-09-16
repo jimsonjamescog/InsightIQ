@@ -1,0 +1,15 @@
+sources:
+  - id: uci_online_retail_ii
+    title: Online Retail II
+    publisher: UCI Machine Learning Repository
+    url: https://archive.ics.uci.edu/dataset/502/online+retail
+    doi: 10.24432/C5CG6D
+    license: CC BY 4.0
+    coverage: 2009-12-01 through 2011-12-09
+    usage: Optional real-world transaction source for demonstrating ingestion and profiling.
+
+generated_sources:
+  - id: insightiq_controlled_scenario
+    generator: insightiq.data.warehouse
+    seed_behavior: deterministic SQL generation
+    usage: Controlled 90-day business and operational world for repeatable root-cause evaluation.

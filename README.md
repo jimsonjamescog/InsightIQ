@@ -21,6 +21,10 @@ The included scenario investigates a 40% reported-revenue drop caused by a deplo
 - FastAPI service and lightweight demo UI
 - Structured JSON logging
 - Hidden-ground-truth evaluation harness
+- Reproducible 90-day DuckDB business warehouse
+- Snowflake DDL, loader, and dbt transformation project
+- Operational metadata, realistic decoys, and resettable failure injection
+- Twelve typed analytics, quality, metadata, lineage, and impact tools
 - Unit and integration tests
 - Docker and GitHub Actions configuration
 
@@ -37,6 +41,17 @@ uvicorn insightiq.api.main:app --reload
 ```
 
 Open [http://localhost:8000](http://localhost:8000). The default `deterministic` mode runs locally with the built-in scenario.
+
+On first startup, InsightIQ creates `data/insightiq.duckdb`. You can explicitly manage it with:
+
+```bash
+insightiq-data build
+insightiq-data validate
+insightiq-data profile
+insightiq-data reset
+```
+
+For a real-world ingestion demonstration, the project selects [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail). After downloading its workbook, install the `real-data` extra and run `insightiq-data import-uci --source <workbook>`.
 
 Run the tests and evaluator:
 
@@ -106,15 +121,36 @@ scenarios/        hidden evaluator fixtures
 tests/            unit and end-to-end tests
 ```
 
-## Snowflake integration
+## Data engineering implementation
 
-The MVP ships with a deterministic repository so the complete AI workflow is runnable by every contributor. Production tools should implement the `ToolRegistry` contract and return the same `ToolResult` envelope:
+The default DuckDB backend mirrors the target Snowflake schemas and makes the entire project runnable without cloud credentials:
+
+```text
+RAW          customers, orders, order_items, products, web_traffic, payments
+BUSINESS     customer snapshots, order facts, KPI and regional models
+QUALITY      historical field-quality metrics
+OPERATIONS   deployments, pipeline runs, schema changes, lineage, incidents, docs
+```
+
+The injected scenario preserves actual revenue at `$120,000` while a customer-region mapping regression causes the reporting model to emit `$72,000`. Traffic, payments, pipeline status, and unrelated deployments provide plausible decoys.
+
+See [`docs/data-engineering.md`](docs/data-engineering.md) for ownership, contracts, warehouse setup, and Snowflake instructions.
+
+Every backend returns the same `ToolResult` envelope:
 
 ```text
 tool_name, execution_id, query_id, source, timestamp, result
 ```
 
-Keep metric names, dimensions, and SQL templates allowlisted. Never grant the model unrestricted SQL access, and never make `scenarios/ground_truth.json` available to an investigation tool.
+To use Snowflake:
+
+```bash
+pip install -e ".[snowflake]"
+insightiq-snowflake-load
+dbt build --profiles-dir dbt
+```
+
+Then set `INSIGHTIQ_DATA_BACKEND=snowflake`. Keep metric names, dimensions, and SQL templates allowlisted. Never grant the model unrestricted SQL access, and never make `scenarios/ground_truth.json` available to an investigation tool.
 
 ## Trust rules
 
@@ -130,5 +166,5 @@ Keep metric names, dimensions, and SQL templates allowlisted. Never grant the mo
 
 - Investigations execute synchronously.
 - State is stored in memory.
-- The bundled scenario is deliberately small.
-- The live data warehouse adapter is an extension point rather than a configured deployment.
+- The bundled scenario is deliberately controlled and compact.
+- Snowflake requires your account, warehouse, role, and authentication configuration.
