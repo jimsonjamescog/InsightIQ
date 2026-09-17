@@ -5,59 +5,122 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>InsightIQ</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; background: #08111f; color: #e7eef9; }
-    main { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
-    .eyebrow { color: #61d3ba; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
-    h1 { font-size: clamp(40px, 7vw, 72px); margin: 8px 0; line-height: 1; }
-    .tagline { color: #9eb0ca; font-size: 20px; margin-bottom: 32px; }
-    .panel { background: #101d30; border: 1px solid #223451; border-radius: 16px; padding: 20px; margin-top: 20px; }
-    form { display: flex; gap: 12px; }
-    input { flex: 1; background: #08111f; color: white; border: 1px solid #355073; border-radius: 10px; padding: 14px; font-size: 16px; }
-    button { background: #61d3ba; color: #07111c; border: 0; border-radius: 10px; padding: 0 22px; font-weight: 700; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: wait; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .metric { font-size: 30px; font-weight: 750; color: #61d3ba; }
-    .muted { color: #9eb0ca; }
-    .chain li { margin: 14px 0; padding-left: 6px; }
-    .evidence { border-left: 3px solid #61d3ba; padding: 8px 12px; margin: 10px 0; background: #0b1727; }
-    .rejected { border-left: 3px solid #ff9c9c; padding: 8px 12px; margin: 10px 0; background: #0b1727; }
-    .intent { border-left: 3px solid #f2c66d; padding: 12px; background: #0b1727; }
-    .hypothesis { padding: 12px; margin: 8px 0; background: #0b1727; border-radius: 10px; }
-    .event { padding: 8px 0; border-bottom: 1px solid #223451; }
-    .badge { display: inline-block; border-radius: 999px; padding: 5px 10px; background: #1d3651; font-size: 12px; margin-right: 6px; }
-    .error { color: #ff9c9c; }
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      --bg: #0b0f14; --surface: #121820; --surface-2: #171f29; --line: #293440;
+      --text: #eef2f6; --muted: #96a3b2; --accent: #54d6a4; --blue: #79aef8;
+      --amber: #f0bf69; --red: #ef8585;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    header { border-bottom: 1px solid var(--line); background: #0d1218; }
+    .topbar { max-width: 1180px; height: 64px; margin: auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; font-size: 18px; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; background: var(--accent); color: #07110d; border-radius: 6px; font-weight: 900; }
+    .mode { color: var(--muted); font-size: 13px; }
+    .mode::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--accent); }
+    main { max-width: 1180px; margin: 0 auto; padding: 36px 24px 72px; }
+    .intro { max-width: 760px; }
+    .eyebrow { color: var(--accent); text-transform: uppercase; font-size: 11px; font-weight: 750; }
+    h1 { font-size: 32px; margin: 8px 0; line-height: 1.2; }
+    h2 { margin: 0 0 16px; font-size: 16px; }
+    .tagline { color: var(--muted); font-size: 16px; margin: 0 0 24px; }
+    .query { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    form { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    input { min-width: 0; background: #0c1117; color: white; border: 1px solid #364452; border-radius: 6px; padding: 13px 14px; font-size: 15px; outline: none; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #54d6a422; }
+    button { background: var(--accent); color: #07110d; border: 0; border-radius: 6px; padding: 0 20px; font-weight: 750; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { min-height: 20px; margin: 12px 2px 0; font-size: 13px; }
+    .tabs { display: flex; gap: 4px; margin-top: 28px; border-bottom: 1px solid var(--line); }
+    .tab { background: transparent; color: var(--muted); border-radius: 0; padding: 11px 14px; border-bottom: 2px solid transparent; }
+    .tab.active { color: var(--text); border-color: var(--accent); }
+    .tab-panel { padding-top: 20px; }
+    .panel { border-bottom: 1px solid var(--line); padding: 22px 0; }
+    .panel:first-child { padding-top: 0; }
+    .summary { display: grid; grid-template-columns: 1.8fr repeat(3, minmax(130px, .65fr)); gap: 1px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); }
+    .summary > div { background: var(--surface); padding: 18px; }
+    .summary h2 { margin-bottom: 9px; }
+    .metric { font-size: 25px; font-weight: 780; color: var(--accent); }
+    .metric-label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .muted { color: var(--muted); }
+    .intent { border-left: 3px solid var(--amber); padding: 12px 14px; background: var(--surface); }
+    .hypothesis { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .hypothesis:last-child, .event:last-child { border-bottom: 0; }
+    .hypothesis p { margin: 5px 0; color: var(--muted); font-size: 13px; }
+    .score { color: var(--accent); font-weight: 750; font-variant-numeric: tabular-nums; }
+    .hypothesis-evidence { grid-column: 2 / -1; display: grid; gap: 6px; margin-top: 2px; }
+    .evidence-line { padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--surface); color: #cbd4dd; font-size: 12px; line-height: 1.45; }
+    .evidence-line.contradicts { border-left-color: var(--red); }
+    .evidence-kind { color: var(--muted); font-weight: 750; margin-right: 6px; text-transform: uppercase; font-size: 9px; }
+    .event { display: grid; grid-template-columns: 165px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .badge { display: inline-block; border-radius: 4px; padding: 4px 7px; background: #23303d; color: #c6d0da; font-size: 10px; font-weight: 750; margin-right: 5px; }
+    .evidence, .rejected { padding: 14px; margin: 10px 0; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; }
+    .rejected { border-left-color: var(--red); }
+    .evidence p, .rejected p { margin: 10px 0 7px; }
+    .chain { margin: 0; padding-left: 28px; }
+    .chain li { padding: 0 0 18px 8px; }
+    .error { color: var(--red); }
+    .success { color: var(--accent); }
+    small { line-height: 1.55; overflow-wrap: anywhere; }
     [hidden] { display: none !important; }
+    @media (max-width: 760px) {
+      main { padding: 26px 16px 56px; }
+      .topbar { padding: 0 16px; }
+      form { grid-template-columns: 1fr; }
+      form button { height: 44px; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .summary .answer { grid-column: 1 / -1; }
+      .hypothesis { grid-template-columns: auto 1fr; }
+      .score { grid-column: 2; }
+      .event { grid-template-columns: 1fr; gap: 5px; }
+      .tabs { overflow-x: auto; }
+    }
   </style>
 </head>
 <body>
+<header><div class="topbar"><div class="brand"><span class="brand-mark">IQ</span>InsightIQ</div><div class="mode">OpenAI investigator</div></div></header>
 <main>
-  <div class="eyebrow">Autonomous Business Investigation</div>
-  <h1>InsightIQ</h1>
-  <p class="tagline">Don't just detect what changed. Investigate why.</p>
-  <section class="panel">
+  <div class="intro">
+    <div class="eyebrow">Business investigation workspace</div>
+    <h1>What changed, and why?</h1>
+    <p class="tagline">Ask a question about revenue, orders, regions, payments, or data quality.</p>
+  </div>
+  <section class="query">
     <form id="form">
-      <input id="question" value="Why did reported revenue decrease yesterday?" aria-label="Investigation question">
+      <input id="question" value="Why did reported revenue decrease yesterday?" aria-label="Investigation question" autocomplete="off">
       <button id="run">Investigate</button>
     </form>
-    <p id="status" class="muted">Facts are earned. Conclusions are justified. Confidence is calculated.</p>
+    <p id="status" class="muted">Ready to investigate the latest warehouse data.</p>
   </section>
   <div id="result" hidden>
-    <section class="panel"><h2>Current investigation</h2><div id="intent" class="intent"></div></section>
-    <section class="panel"><h2>Live hypotheses</h2><div id="hypotheses"></div></section>
-    <section class="panel"><h2>Investigation timeline</h2><div id="timeline"></div></section>
-    <section class="grid">
-      <div class="panel"><div class="muted">Confidence</div><div id="confidence" class="metric"></div></div>
-      <div class="panel"><div class="muted">Tool calls</div><div id="calls" class="metric"></div></div>
-      <div class="panel"><div class="muted">Evidence gate</div><div id="gate" class="metric"></div></div>
-    </section>
-    <section class="panel"><h2>Confidence dimensions</h2><div id="dimensions"></div></section>
-    <section class="panel"><h2>Conclusion</h2><p id="conclusion"></p></section>
-    <section class="panel"><h2>Root-cause chain</h2><ol id="chain" class="chain"></ol></section>
-    <section class="panel"><h2>Rejected hypotheses</h2><div id="rejected"></div></section>
-    <section class="panel"><h2>Business impact</h2><p id="impact"></p></section>
-    <section class="panel"><h2>Evidence</h2><div id="evidence"></div></section>
-    <section class="panel"><h2>Recommendation</h2><p id="recommendation"></p></section>
+    <nav class="tabs" aria-label="Investigation views">
+      <button class="tab active" type="button" data-tab="overview">Overview</button>
+      <button class="tab" type="button" data-tab="hypothesis-view">Hypotheses</button>
+      <button class="tab" type="button" data-tab="evidence-view">Evidence</button>
+      <button class="tab" type="button" data-tab="timeline-view">Timeline</button>
+    </nav>
+    <div id="overview" class="tab-panel">
+      <section class="summary">
+        <div class="answer"><h2>Conclusion</h2><div id="conclusion" class="muted">Investigation in progress.</div></div>
+        <div><div class="metric-label">Conclusion confidence</div><div id="confidence" class="metric">—</div></div>
+        <div><div class="metric-label">Evidence gate</div><div id="gate" class="metric">—</div></div>
+        <div><div class="metric-label">Tool calls</div><div id="calls" class="metric">0</div></div>
+      </section>
+      <section class="panel"><h2>Current investigation</h2><div id="intent" class="intent"></div></section>
+      <section id="gate-details-panel" class="panel" hidden><h2 id="gate-details-title">Evidence gate details</h2><div id="gate-details"></div></section>
+      <section class="panel"><h2>Business impact</h2><p id="impact" class="muted">Calculating…</p></section>
+      <section class="panel"><h2>Root-cause chain</h2><ol id="chain" class="chain"></ol></section>
+      <section class="panel"><h2>Recommendation</h2><p id="recommendation"></p></section>
+      <section class="panel"><h2>Confidence dimensions</h2><div id="dimensions"></div></section>
+    </div>
+    <div id="hypothesis-view" class="tab-panel" hidden>
+      <section class="panel"><h2>Live hypotheses</h2><div id="hypotheses"></div></section>
+      <section class="panel"><h2>Rejected hypotheses</h2><div id="rejected"></div></section>
+    </div>
+    <div id="evidence-view" class="tab-panel" hidden><section class="panel"><h2>Evidence ledger</h2><div id="evidence"></div></section></div>
+    <div id="timeline-view" class="tab-panel" hidden><section class="panel"><h2>Investigation timeline</h2><div id="timeline"></div></section></div>
   </div>
 </main>
 <script>
@@ -65,9 +128,21 @@ const form = document.querySelector('#form');
 const button = document.querySelector('#run');
 const status = document.querySelector('#status');
 const result = document.querySelector('#result');
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === tab));
+  document.querySelectorAll('.tab-panel').forEach(panel => { panel.hidden = panel.id !== tab.dataset.tab; });
+}));
 form.addEventListener('submit', async (event) => {
   event.preventDefault(); button.disabled = true; result.hidden = true;
-  status.className = 'muted'; status.textContent = 'Investigating…';
+  button.textContent = 'Investigating…';
+  status.className = 'muted'; status.textContent = 'Starting investigation…';
+  document.querySelector('#confidence').textContent = '—';
+  document.querySelector('#confidence').className = 'metric';
+  document.querySelector('#gate').textContent = '—';
+  document.querySelector('#gate').className = 'metric';
+  document.querySelector('#gate-details-panel').hidden = true;
+  document.querySelector('#calls').textContent = '0';
+  document.querySelector('#conclusion').textContent = 'Investigation in progress.';
   try {
     const response = await fetch('/investigations/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: document.querySelector('#question').value})});
     if (!response.ok) throw new Error(await response.text());
@@ -89,27 +164,49 @@ form.addEventListener('submit', async (event) => {
     }
     if (!reportResponse.ok) throw new Error('Final report was not ready in time.');
     const report = await reportResponse.json();
-    document.querySelector('#confidence').textContent = `${Math.round(report.confidence.overall * 100)}%`;
+    const confidence = document.querySelector('#confidence');
+    confidence.textContent = report.evidence_gate.passed ? `${Math.round(report.confidence.overall * 100)}%` : 'N/A';
+    confidence.className = `metric ${report.evidence_gate.passed ? 'success' : 'muted'}`;
     document.querySelector('#calls').textContent = report.statistics.tool_calls;
-    document.querySelector('#gate').textContent = report.evidence_gate.passed ? 'PASSED' : 'FAILED';
+    const gate = document.querySelector('#gate');
+    gate.textContent = report.evidence_gate.passed ? 'Passed' : 'Stopped';
+    gate.className = `metric ${report.evidence_gate.passed ? 'success' : 'error'}`;
+    const gateDetails = report.evidence_gate.passed
+      ? report.evidence_gate.reasons
+      : report.evidence_gate.missing_evidence;
+    document.querySelector('#gate-details-title').textContent = report.evidence_gate.passed ? 'Why the evidence gate passed' : 'Why evidence is insufficient';
+    document.querySelector('#gate-details').innerHTML = gateDetails.length
+      ? `<ul class="chain">${gateDetails.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '<p class="muted">No additional gate details are available.</p>';
+    document.querySelector('#gate-details-panel').hidden = false;
     document.querySelector('#dimensions').innerHTML = `<span class="badge">Strength ${Math.round(report.confidence.evidence_strength * 100)}</span><span class="badge">Coverage ${Math.round(report.confidence.coverage * 100)}</span><span class="badge">Consistency ${Math.round(report.confidence.consistency * 100)}</span>`;
     document.querySelector('#conclusion').textContent = report.conclusions[0];
     document.querySelector('#chain').innerHTML = report.root_cause_chain.map(item => `<li><span class="badge">${escapeHtml(item.classification)}</span>${escapeHtml(item.statement)}<br><small class="muted">Evidence: ${item.evidence_ids.map(escapeHtml).join(', ')}</small></li>`).join('');
     document.querySelector('#rejected').innerHTML = report.rejected_hypotheses.length ? report.rejected_hypotheses.map(item => `<div class="rejected"><span class="badge">REJECTED</span><strong>${escapeHtml(item.description)}</strong><p>${escapeHtml(item.rejection_reason || 'Contradicted by observed evidence.')}</p><small class="muted">Contradicting evidence: ${item.contradicting_evidence_ids.map(escapeHtml).join(', ')}</small></div>`).join('') : '<p class="muted">No hypotheses were rejected.</p>';
     const impact = report.business_impact;
-    document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${impact.understatement.toLocaleString()} ${impact.unit} (${impact.understatement_percent}% understatement)`;
+    document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${new Intl.NumberFormat('en-US', {style: 'currency', currency: impact.unit || 'USD', maximumFractionDigits: 0}).format(impact.understatement)} lost revenue (${impact.understatement_percent}% impact)`;
     document.querySelector('#evidence').innerHTML = report.evidence.map(item => `<div class="evidence"><span class="badge">${escapeHtml(item.classification)}</span><span class="badge">${escapeHtml(item.evidence_type)}</span><span class="badge">${escapeHtml(item.tool_name)}</span><p>${escapeHtml(item.statement)}</p><small class="muted">${escapeHtml(item.source)} · ${escapeHtml(item.query_id)} · supports ${item.supports.map(escapeHtml).join(', ') || 'none'} · contradicts ${item.contradicts.map(escapeHtml).join(', ') || 'none'}</small></div>`).join('');
     document.querySelector('#recommendation').textContent = report.recommendation;
-    result.hidden = false; status.textContent = `Investigation ${report.investigation_id} completed.`;
+    result.hidden = false; status.className = 'success'; status.textContent = `Investigation completed · ${report.investigation_id}`;
   } catch (error) { status.className = 'error'; status.textContent = error.message; }
-  finally { button.disabled = false; }
+  finally { button.disabled = false; button.textContent = 'Investigate'; }
 });
 function renderProgress(state) {
   const intent = state.current_intent;
   document.querySelector('#intent').innerHTML = intent ? `<strong>${escapeHtml(intent.hypothesis || intent.question)}</strong><p>Seeking: ${escapeHtml(intent.evidence_sought)}</p><small class="muted">Tool: ${escapeHtml(intent.selected_tool)} · ${escapeHtml(intent.reason)}</small>` : '<span class="muted">Evidence Gate is deciding whether the investigation is sufficient.</span>';
-  document.querySelector('#hypotheses').innerHTML = state.hypotheses.map(item => `<div class="hypothesis"><span class="badge">${escapeHtml(item.status)}</span><span class="badge">Priority ${escapeHtml(item.investigation_priority)}</span><strong>${escapeHtml(item.description)}</strong><p>Evidence Support Score: ${item.support_score}</p><small class="muted">Next evidence: ${item.next_evidence_needed.map(escapeHtml).join('; ') || 'none'}</small></div>`).join('');
+  const evidenceById = new Map(state.evidence.map(item => [item.evidence_id, item]));
+  document.querySelector('#hypotheses').innerHTML = state.hypotheses.map(item => {
+    const supporting = item.supporting_evidence_ids.map(id => evidenceById.get(id)).filter(Boolean);
+    const contradicting = item.contradicting_evidence_ids.map(id => evidenceById.get(id)).filter(Boolean);
+    const evidence = [
+      ...supporting.map(entry => `<div class="evidence-line"><span class="evidence-kind">Supports</span>${escapeHtml(entry.statement)}</div>`),
+      ...contradicting.map(entry => `<div class="evidence-line contradicts"><span class="evidence-kind">Contradicts</span>${escapeHtml(entry.statement)}</div>`),
+    ];
+    return `<div class="hypothesis"><span class="badge">${escapeHtml(item.status)}</span><div><strong>${escapeHtml(item.description)}</strong><p>${item.next_evidence_needed.length ? `Next: ${item.next_evidence_needed.map(escapeHtml).join('; ')}` : 'Evidence collection complete'}</p></div><span class="score">${Math.round(item.support_score)}%</span>${evidence.length ? `<div class="hypothesis-evidence">${evidence.join('')}</div>` : ''}</div>`;
+  }).join('');
   document.querySelector('#timeline').innerHTML = state.events.map(item => `<div class="event"><span class="badge">${escapeHtml(item.event_type)}</span>${escapeHtml(item.message)}</div>`).join('');
-  status.textContent = `Investigation ${state.investigation_id}: ${state.status}`;
+  document.querySelector('#calls').textContent = state.tool_calls;
+  status.textContent = `${state.status === 'RUNNING' ? 'Investigating' : state.status} · ${state.investigation_id}`;
 }
 function escapeHtml(value) { const node = document.createElement('div'); node.textContent = value ?? ''; return node.innerHTML; }
 </script>
