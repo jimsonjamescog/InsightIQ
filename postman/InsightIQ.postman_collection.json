@@ -1,0 +1,502 @@
+{
+  "info": {
+    "_postman_id": "72e1c784-3ce0-4d0c-9ce1-0ed5c3892257",
+    "name": "InsightIQ API",
+    "description": "Import-ready API checks for InsightIQ. Start the service with `uvicorn insightiq.api.main:app --reload`, then run the collection in order. The synchronous workflow stores `investigationId`; the background workflow polls until the investigation finishes and stores `backgroundInvestigationId`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('baseUrl')) {",
+          "    pm.collectionVariables.set('baseUrl', 'http://localhost:8000');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "question",
+      "value": "Why did reported revenue decrease yesterday?",
+      "type": "string"
+    },
+    {
+      "key": "investigationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "backgroundInvestigationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "backgroundPollCount",
+      "value": "0",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Service contracts",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Confirms the API is available and reports its active agent and data configuration."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('responds quickly', () => pm.expect(pm.response.responseTime).to.be.below(2000));",
+                  "pm.test('returns the health contract', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql('ok');",
+                  "    pm.expect(['deterministic', 'openai']).to.include(body.agent_mode);",
+                  "    pm.expect(['duckdb', 'mock', 'snowflake']).to.include(body.data_backend);",
+                  "    pm.expect(body.tools).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List tool contracts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tools",
+              "host": ["{{baseUrl}}"],
+              "path": ["tools"]
+            },
+            "description": "Returns the allowlisted investigation tools and their schemas and capabilities."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('every tool publishes its contract', () => {",
+                  "    const tools = pm.response.json().tools;",
+                  "    pm.expect(tools).to.be.an('array').that.is.not.empty;",
+                  "    tools.forEach((tool) => {",
+                  "        pm.expect(tool.name).to.be.a('string').and.not.empty;",
+                  "        pm.expect(tool.input_schema).to.be.an('object');",
+                  "        pm.expect(tool.output_schema).to.be.an('object');",
+                  "        pm.expect(tool.capabilities).to.be.an('array').that.is.not.empty;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Synchronous investigation workflow",
+      "item": [
+        {
+          "name": "Create investigation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"{{question}}\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/investigations",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations"]
+            },
+            "description": "Runs an investigation to completion and saves its ID for the remaining requests."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns a complete report', () => {",
+                  "    pm.expect(body.investigation_id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.question).to.eql(pm.variables.get('question'));",
+                  "    pm.expect(body.evidence).to.be.an('array');",
+                  "    pm.expect(body.hypotheses).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(body.confidence.overall).to.be.within(0, 1);",
+                  "    pm.expect(['ROOT_CAUSE_ESTABLISHED', 'PROBABLE_ROOT_CAUSE', 'INSUFFICIENT_EVIDENCE']).to.include(body.outcome);",
+                  "    pm.expect(body.statistics.tool_calls).to.be.a('number');",
+                  "});",
+                  "pm.test('root-cause links cite evidence', () => {",
+                  "    body.root_cause_chain.forEach((link) => {",
+                  "        pm.expect(['OBSERVED', 'INFERRED']).to.include(link.classification);",
+                  "        pm.expect(link.evidence_ids).to.be.an('array').that.is.not.empty;",
+                  "    });",
+                  "});",
+                  "if (body.investigation_id) pm.collectionVariables.set('investigationId', body.investigation_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get investigation state",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{investigationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{investigationId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the saved completed investigation', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.investigation_id).to.eql(pm.collectionVariables.get('investigationId'));",
+                  "    pm.expect(['COMPLETED', 'INSUFFICIENT_EVIDENCE']).to.include(body.status);",
+                  "    pm.expect(body.events).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get investigation evidence",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{investigationId}}/evidence",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{investigationId}}", "evidence"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('observed evidence includes provenance', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.investigation_id).to.eql(pm.collectionVariables.get('investigationId'));",
+                  "    pm.expect(body.evidence).to.be.an('array').that.is.not.empty;",
+                  "    body.evidence.filter((item) => item.classification === 'OBSERVED').forEach((item) => {",
+                  "        pm.expect(item.tool_name).to.be.a('string').and.not.empty;",
+                  "        pm.expect(item.execution_id).to.be.a('string').and.not.empty;",
+                  "        pm.expect(item.source).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get investigation graph",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{investigationId}}/graph",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{investigationId}}", "graph"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns graph nodes and valid edges', () => {",
+                  "    const graph = pm.response.json();",
+                  "    pm.expect(graph.nodes).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(graph.edges).to.be.an('array');",
+                  "    const nodeIds = graph.nodes.map((node) => node.id);",
+                  "    graph.edges.forEach((edge) => {",
+                  "        pm.expect(nodeIds).to.include(edge.source);",
+                  "        pm.expect(nodeIds).to.include(edge.target);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get investigation report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{investigationId}}/report",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{investigationId}}", "report"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the canonical report', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.investigation_id).to.eql(pm.collectionVariables.get('investigationId'));",
+                  "    pm.expect(body.recommendation).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.evidence_gate).to.have.all.keys('passed', 'confidence', 'reasons', 'missing_evidence');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Background investigation workflow",
+      "item": [
+        {
+          "name": "Start background investigation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Why did customer region data become incomplete?\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/investigations/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "start"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 202', () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test('starts a running investigation', () => {",
+                  "    pm.expect(body.investigation_id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.status).to.eql('RUNNING');",
+                  "});",
+                  "pm.collectionVariables.set('backgroundInvestigationId', body.investigation_id);",
+                  "pm.collectionVariables.set('backgroundPollCount', '0');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Poll background investigation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{backgroundInvestigationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{backgroundInvestigationId}}"]
+            },
+            "description": "In a collection run, this request repeats up to 30 times while status is RUNNING. Postman adds a short delay between polls."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const count = Number(pm.collectionVariables.get('backgroundPollCount') || 0);",
+                  "if (count > 0) {",
+                  "    const started = Date.now();",
+                  "    while (Date.now() - started < 300) {}",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const count = Number(pm.collectionVariables.get('backgroundPollCount') || 0) + 1;",
+                  "pm.collectionVariables.set('backgroundPollCount', String(count));",
+                  "pm.test('returns a valid investigation status', () => {",
+                  "    pm.expect(body.investigation_id).to.eql(pm.collectionVariables.get('backgroundInvestigationId'));",
+                  "    pm.expect(['RUNNING', 'COMPLETED', 'INSUFFICIENT_EVIDENCE', 'FAILED']).to.include(body.status);",
+                  "});",
+                  "if (body.status === 'RUNNING' && count < 30) {",
+                  "    pm.execution.setNextRequest('Poll background investigation');",
+                  "} else if (body.status === 'RUNNING') {",
+                  "    pm.test('background investigation completed within poll limit', () => {",
+                  "        pm.expect.fail('Still RUNNING after 30 polls');",
+                  "    });",
+                  "} else {",
+                  "    pm.test('background investigation finished successfully', () => {",
+                  "        pm.expect(['COMPLETED', 'INSUFFICIENT_EVIDENCE']).to.include(body.status);",
+                  "        pm.expect(body.events).to.be.an('array').that.is.not.empty;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get background report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/{{backgroundInvestigationId}}/report",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "{{backgroundInvestigationId}}", "report"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the background investigation report', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.investigation_id).to.eql(pm.collectionVariables.get('backgroundInvestigationId'));",
+                  "    pm.expect(body.statistics.steps).to.be.a('number').and.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error contracts",
+      "item": [
+        {
+          "name": "Unknown investigation returns 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/investigations/unknown-investigation",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations", "unknown-investigation"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('returns the expected error', () => {",
+                  "    pm.expect(pm.response.json().detail).to.eql('Investigation not found.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Short question returns 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Why?\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/investigations",
+              "host": ["{{baseUrl}}"],
+              "path": ["investigations"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns HTTP 422', () => pm.response.to.have.status(422));",
+                  "pm.test('identifies the question field', () => {",
+                  "    const errors = pm.response.json().detail;",
+                  "    pm.expect(errors).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(errors[0].loc).to.include('question');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
