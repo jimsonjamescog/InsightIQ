@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +10,10 @@ class Settings(BaseSettings):
 
     agent_mode: str = Field(default="deterministic", pattern="^(deterministic|openai)$")
     openai_model: str = "gpt-5.6-sol"
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENAI_API_KEY", "INSIGHTIQ_OPENAI_API_KEY"),
+    )
     max_steps: int = Field(default=15, ge=1, le=50)
     max_tool_calls: int = Field(default=12, ge=1, le=50)
     confidence_threshold: float = Field(default=0.75, ge=0, le=1)

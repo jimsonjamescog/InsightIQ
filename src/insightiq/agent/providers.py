@@ -231,9 +231,14 @@ class DeterministicDecisionProvider(DecisionProvider):
 class OpenAIDecisionProvider(DecisionProvider):
     """Responses API planner constrained to discovered, allowlisted tools."""
 
-    def __init__(self, model: str, client: OpenAI | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        client: OpenAI | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self.model = model
-        self.client = client or OpenAI()
+        self.client = client or OpenAI(api_key=api_key)
 
     def decide(self, state: InvestigationState, registry: ToolRegistry) -> AgentDecision:
         finish_tool = {

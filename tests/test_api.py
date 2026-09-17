@@ -11,13 +11,16 @@ def test_health():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert isinstance(response.json()["openai_configured"], bool)
 
 
-def test_demo_exposes_rejected_hypotheses():
+def test_demo_exposes_unified_investigation_path():
     response = client.get("/")
     assert response.status_code == 200
-    assert "Rejected hypotheses" in response.text
-    assert "Current investigation" in response.text
+    assert "Investigation path" in response.text
+    assert "OBSERVED" in response.text
+    assert "INFERRED" in response.text
+    assert "Rejected hypotheses" not in response.text
 
 
 def test_tool_registry_metadata_is_discoverable():

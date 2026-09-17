@@ -29,7 +29,8 @@ registry = build_registry(settings)
 
 def build_provider():
     if settings.agent_mode == "openai":
-        return OpenAIDecisionProvider(settings.openai_model)
+        api_key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else None
+        return OpenAIDecisionProvider(settings.openai_model, api_key=api_key)
     return DeterministicDecisionProvider()
 
 
@@ -68,6 +69,7 @@ def health() -> dict:
         "status": "ok",
         "agent_mode": settings.agent_mode,
         "model": settings.openai_model if settings.agent_mode == "openai" else None,
+        "openai_configured": bool(settings.openai_api_key),
         "data_backend": settings.data_backend,
         "tools": registry.names,
     }

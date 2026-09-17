@@ -94,14 +94,26 @@ python -m insightiq.evaluation.runner
 
 ## Optional OpenAI mode
 
-Copy `.env.example` to `.env`, set `OPENAI_API_KEY`, and change:
+Create a local environment file (it is ignored by Git):
+
+```bash
+cp .env.example .env
+chmod 600 .env
+```
+
+Edit `.env` and set these values. Keep the real key server-side; never put it in the browser,
+source code, screenshots, or a commit.
 
 ```text
 INSIGHTIQ_AGENT_MODE=openai
 INSIGHTIQ_OPENAI_MODEL=gpt-5.6-sol
+OPENAI_API_KEY=your-key-here
 ```
 
-The OpenAI path uses custom function tools through the Responses API. Tool execution, calculations, provenance validation, confidence, and the final evidence-gate decision remain deterministic application responsibilities.
+Restart Uvicorn after changing `.env`, then confirm `/health` reports
+`"agent_mode":"openai"` and `"openai_configured":true`. The OpenAI path uses custom
+function tools through the Responses API. Tool execution, calculations, provenance validation,
+confidence, and the final evidence-gate decision remain deterministic application responsibilities.
 
 ## API
 

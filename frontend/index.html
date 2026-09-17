@@ -5,113 +5,229 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>InsightIQ</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; background: #08111f; color: #e7eef9; }
-    main { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
-    .eyebrow { color: #61d3ba; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
-    h1 { font-size: clamp(40px, 7vw, 72px); margin: 8px 0; line-height: 1; }
-    .tagline { color: #9eb0ca; font-size: 20px; margin-bottom: 32px; }
-    .panel { background: #101d30; border: 1px solid #223451; border-radius: 16px; padding: 20px; margin-top: 20px; }
-    form { display: flex; gap: 12px; }
-    input { flex: 1; background: #08111f; color: white; border: 1px solid #355073; border-radius: 10px; padding: 14px; font-size: 16px; }
-    button { background: #61d3ba; color: #07111c; border: 0; border-radius: 10px; padding: 0 22px; font-weight: 700; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: wait; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .metric { font-size: 30px; font-weight: 750; color: #61d3ba; }
-    .muted { color: #9eb0ca; }
-    .chain li { margin: 14px 0; padding-left: 6px; }
-    .evidence { border-left: 3px solid #61d3ba; padding: 8px 12px; margin: 10px 0; background: #0b1727; }
-    .rejected { border-left: 3px solid #ff9c9c; padding: 8px 12px; margin: 10px 0; background: #0b1727; }
-    .intent { border-left: 3px solid #f2c66d; padding: 12px; background: #0b1727; }
-    .hypothesis { padding: 12px; margin: 8px 0; background: #0b1727; border-radius: 10px; }
-    .event { padding: 8px 0; border-bottom: 1px solid #223451; }
-    .badge { display: inline-block; border-radius: 999px; padding: 5px 10px; background: #1d3651; font-size: 12px; margin-right: 6px; }
-    .error { color: #ff9c9c; }
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #162b2b;
+      background: #f3f6f5;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #f3f6f5; }
+    button, input { font: inherit; }
+    .topbar { background: #103f3c; color: white; }
+    .topbar-inner { max-width: 1120px; margin: 0 auto; padding: 22px 28px; display: flex; align-items: center; gap: 14px; }
+    .mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #d4f06b; color: #103f3c; font-weight: 900; }
+    .brand { font-weight: 800; font-size: 19px; letter-spacing: -.02em; }
+    .brand-subtitle { color: #b8ceca; font-size: 12px; margin-top: 2px; }
+    main { max-width: 1120px; margin: 0 auto; padding: 42px 28px 80px; }
+    .eyebrow { color: #26746d; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; font-size: 11px; }
+    h1 { font-size: clamp(34px, 5vw, 54px); line-height: 1.08; letter-spacing: -.045em; margin: 8px 0 10px; }
+    .tagline { color: #58706e; font-size: 18px; margin: 0 0 28px; }
+    .panel { background: white; border: 1px solid #dbe5e3; border-radius: 12px; box-shadow: 0 8px 26px rgba(22, 54, 52, .06); }
+    .question-panel { padding: 20px; }
+    form { display: flex; gap: 10px; }
+    input { min-width: 0; flex: 1; border: 1px solid #b9cbc8; border-radius: 8px; padding: 13px 15px; color: #162b2b; background: #fbfdfc; outline: none; }
+    input:focus { border-color: #26746d; box-shadow: 0 0 0 3px rgba(38, 116, 109, .12); }
+    button { background: #176a62; color: white; border: 0; border-radius: 8px; padding: 0 22px; font-weight: 750; cursor: pointer; }
+    button:hover { background: #105a53; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { margin: 12px 2px 0; font-size: 13px; }
+    .muted { color: #718582; }
+    .error { color: #a73434; }
+    #result { margin-top: 22px; }
+    .path-panel { overflow: hidden; }
+    .panel-head { padding: 19px 22px; border-bottom: 1px solid #e5ecea; display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+    .panel-head h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: -.015em; }
+    .panel-head p { margin: 0; color: #718582; font-size: 13px; }
+    .status-pill, .label { display: inline-flex; align-items: center; width: fit-content; border-radius: 999px; font-weight: 800; letter-spacing: .045em; white-space: nowrap; }
+    .status-pill { padding: 6px 10px; font-size: 10px; }
+    .label { padding: 3px 7px; font-size: 9px; }
+    .testing { color: #715508; background: #fff0bd; }
+    .approved { color: #126047; background: #d9f2e8; }
+    .rejected { color: #9d3030; background: #fbe2e2; }
+    .queued { color: #5c6e6b; background: #edf1f0; }
+    .insufficient { color: #665321; background: #f3ead0; }
+    .observed { color: #175f87; background: #deeff9; }
+    .inferred { color: #694a92; background: #eee5fa; }
+    .path-list { list-style: none; margin: 0; padding: 6px 24px 12px; counter-reset: hypothesis; }
+    .hypothesis-step { position: relative; margin-left: calc(var(--depth, 0) * 24px); padding: 20px 0 6px 46px; counter-increment: hypothesis; }
+    .hypothesis-step::before { content: counter(hypothesis); position: absolute; top: 19px; left: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #e8efed; color: #536a67; font-size: 12px; font-weight: 850; z-index: 1; }
+    .hypothesis-step::after { content: ""; position: absolute; top: 47px; bottom: -18px; left: 13px; width: 2px; background: #dfe7e5; }
+    .hypothesis-step:last-child::after { display: none; }
+    .hypothesis-step.is-approved::before { background: #176a62; color: white; }
+    .hypothesis-step.is-rejected::before { background: #c24b4b; color: white; }
+    .hypothesis-step.is-testing::before { background: #d4f06b; color: #29423f; box-shadow: 0 0 0 4px #f2f8d9; }
+    .hypothesis-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .hypothesis-title h3 { margin: 2px 0 0; font-size: 15px; line-height: 1.45; }
+    .hypothesis-meta { margin-top: 5px; color: #718582; font-size: 11px; }
+    .evidence-branch { list-style: none; margin: 13px 0 4px; padding: 0 0 0 18px; border-left: 2px solid #e6ecea; }
+    .evidence-item { position: relative; padding: 7px 0 8px 14px; }
+    .evidence-item::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #b3c5c2; left: -5px; top: 13px; border: 2px solid white; }
+    .evidence-topline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .evidence-statement { margin: 5px 0 3px; color: #304a47; font-size: 13px; line-height: 1.45; }
+    .provenance { color: #81918f; font-size: 10px; line-height: 1.4; }
+    .seeking { margin: 13px 0 5px; border: 1px dashed #d4b24c; background: #fffaf0; border-radius: 8px; padding: 10px 12px; color: #5f511e; font-size: 12px; }
+    .seeking strong { display: block; margin-bottom: 3px; }
+    .decision-note { margin: 10px 0 4px; padding: 9px 11px; border-radius: 7px; font-size: 12px; line-height: 1.45; }
+    .approved-note { background: #edf8f4; color: #185e4a; }
+    .rejected-note { background: #fdf0f0; color: #8a3434; }
+    .empty-evidence { margin: 11px 0 3px; color: #859492; font-size: 12px; font-style: italic; }
+    .summary-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .metric-card { padding: 16px 18px; }
+    .metric-label { color: #718582; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 750; }
+    .metric { margin-top: 5px; font-size: 25px; font-weight: 820; color: #176a62; }
+    .metric-detail { margin-top: 4px; color: #879693; font-size: 10px; }
+    .conclusion-panel { margin-top: 16px; padding: 22px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+    .summary-block h2 { margin: 0 0 8px; font-size: 13px; color: #58706e; text-transform: uppercase; letter-spacing: .07em; }
+    .summary-block p { margin: 0; line-height: 1.55; font-size: 14px; }
+    .summary-block + .summary-block { border-left: 1px solid #e5ecea; padding-left: 24px; }
+    .recommendation { grid-column: 1 / -1; border-top: 1px solid #e5ecea; padding-top: 18px; }
     [hidden] { display: none !important; }
+    @media (max-width: 720px) {
+      main { padding: 28px 16px 60px; }
+      .topbar-inner { padding: 18px 16px; }
+      form { flex-direction: column; }
+      button { padding: 13px 18px; }
+      .panel-head { align-items: flex-start; }
+      .summary-grid, .conclusion-panel { grid-template-columns: 1fr; }
+      .summary-block + .summary-block { border-left: 0; border-top: 1px solid #e5ecea; padding: 18px 0 0; }
+      .recommendation { grid-column: auto; }
+      .path-list { padding-inline: 16px; }
+      .hypothesis-step { margin-left: calc(var(--depth, 0) * 12px); }
+    }
   </style>
 </head>
 <body>
-<main>
-  <div class="eyebrow">Autonomous Business Investigation</div>
-  <h1>InsightIQ</h1>
-  <p class="tagline">Don't just detect what changed. Investigate why.</p>
-  <section class="panel">
-    <form id="form">
-      <input id="question" value="Why did reported revenue decrease yesterday?" aria-label="Investigation question">
-      <button id="run">Investigate</button>
-    </form>
-    <p id="status" class="muted">Facts are earned. Conclusions are justified. Confidence is calculated.</p>
-  </section>
-  <div id="result" hidden>
-    <section class="panel"><h2>Current investigation</h2><div id="intent" class="intent"></div></section>
-    <section class="panel"><h2>Live hypotheses</h2><div id="hypotheses"></div></section>
-    <section class="panel"><h2>Investigation timeline</h2><div id="timeline"></div></section>
-    <section class="grid">
-      <div class="panel"><div class="muted">Confidence</div><div id="confidence" class="metric"></div></div>
-      <div class="panel"><div class="muted">Tool calls</div><div id="calls" class="metric"></div></div>
-      <div class="panel"><div class="muted">Evidence gate</div><div id="gate" class="metric"></div></div>
+  <header class="topbar"><div class="topbar-inner"><div class="mark">IQ</div><div><div class="brand">InsightIQ</div><div class="brand-subtitle">Evidence-grounded business investigation</div></div></div></header>
+  <main>
+    <div class="eyebrow">Ask a business question</div>
+    <h1>Investigate what changed—and why.</h1>
+    <p class="tagline">The Investigator tests competing explanations until evidence establishes a cause or runs out.</p>
+    <section class="panel question-panel">
+      <form id="form"><input id="question" value="Why did reported revenue decrease yesterday?" aria-label="Investigation question"><button id="run">Investigate</button></form>
+      <p id="status" class="muted">Calculations stay deterministic. The model chooses which controlled tool to use next.</p>
     </section>
-    <section class="panel"><h2>Confidence dimensions</h2><div id="dimensions"></div></section>
-    <section class="panel"><h2>Conclusion</h2><p id="conclusion"></p></section>
-    <section class="panel"><h2>Root-cause chain</h2><ol id="chain" class="chain"></ol></section>
-    <section class="panel"><h2>Rejected hypotheses</h2><div id="rejected"></div></section>
-    <section class="panel"><h2>Business impact</h2><p id="impact"></p></section>
-    <section class="panel"><h2>Evidence</h2><div id="evidence"></div></section>
-    <section class="panel"><h2>Recommendation</h2><p id="recommendation"></p></section>
-  </div>
-</main>
-<script>
-const form = document.querySelector('#form');
-const button = document.querySelector('#run');
-const status = document.querySelector('#status');
-const result = document.querySelector('#result');
-form.addEventListener('submit', async (event) => {
-  event.preventDefault(); button.disabled = true; result.hidden = true;
-  status.className = 'muted'; status.textContent = 'Investigating…';
-  try {
-    const response = await fetch('/investigations/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: document.querySelector('#question').value})});
-    if (!response.ok) throw new Error(await response.text());
-    const started = await response.json(); result.hidden = false;
-    let state;
-    while (true) {
-      const stateResponse = await fetch(`/investigations/${started.investigation_id}`);
-      state = await stateResponse.json(); renderProgress(state);
-      if (state.status !== 'RUNNING') break;
-      await new Promise(resolve => setTimeout(resolve, 200));
+    <div id="result" hidden>
+      <section class="panel path-panel">
+        <div class="panel-head"><div><h2>Investigation path</h2><p>Follow each hypothesis and the evidence used to approve or reject it.</p></div><span id="run-state" class="status-pill queued">QUEUED</span></div>
+        <ol id="investigation-path" class="path-list"></ol>
+      </section>
+      <section class="summary-grid">
+        <div class="panel metric-card"><div class="metric-label">Confidence</div><div id="confidence" class="metric">—</div><div id="confidence-detail" class="metric-detail">Awaiting evidence gate</div></div>
+        <div class="panel metric-card"><div class="metric-label">Controlled tool calls</div><div id="calls" class="metric">—</div><div class="metric-detail">No arbitrary warehouse access</div></div>
+        <div class="panel metric-card"><div class="metric-label">Evidence gate</div><div id="gate" class="metric">—</div><div id="gate-detail" class="metric-detail">Not evaluated</div></div>
+      </section>
+      <section class="panel conclusion-panel">
+        <div class="summary-block"><h2>Conclusion</h2><p id="conclusion">Investigation in progress.</p></div>
+        <div class="summary-block"><h2>Business impact</h2><p id="impact">Being calculated.</p></div>
+        <div class="summary-block recommendation"><h2>Recommended action</h2><p id="recommendation">Available after the evidence gate is evaluated.</p></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const form = document.querySelector('#form');
+    const button = document.querySelector('#run');
+    const status = document.querySelector('#status');
+    const result = document.querySelector('#result');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); button.disabled = true; result.hidden = true;
+      status.className = 'muted'; status.textContent = 'Starting the investigation…';
+      try {
+        const response = await fetch('/investigations/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: document.querySelector('#question').value})});
+        if (!response.ok) throw new Error(await response.text());
+        const started = await response.json(); result.hidden = false; let state;
+        while (true) {
+          const stateResponse = await fetch(`/investigations/${started.investigation_id}`);
+          if (!stateResponse.ok) throw new Error(await stateResponse.text());
+          state = await stateResponse.json(); renderPath(state);
+          if (state.status !== 'RUNNING') break;
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        if (state.status === 'FAILED') throw new Error('Investigation failed. Check the server log.');
+        let reportResponse;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          reportResponse = await fetch(`/investigations/${started.investigation_id}/report`);
+          if (reportResponse.ok) break;
+          if (reportResponse.status !== 409) throw new Error(await reportResponse.text());
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (!reportResponse.ok) throw new Error('Final report was not ready in time.');
+        const report = await reportResponse.json(); renderPath(report, report); renderSummary(report);
+        status.textContent = `Investigation ${report.investigation_id} completed.`;
+      } catch (error) {
+        status.className = 'error'; status.textContent = error.message;
+        document.querySelector('#run-state').className = 'status-pill rejected';
+        document.querySelector('#run-state').textContent = 'FAILED';
+      } finally { button.disabled = false; }
+    });
+
+    function renderPath(state, report = null) {
+      const runState = document.querySelector('#run-state');
+      const stateLabel = report ? (report.evidence_gate.passed ? 'ESTABLISHED' : 'NOT ESTABLISHED') : state.status;
+      runState.textContent = stateLabel.replaceAll('_', ' ');
+      runState.className = `status-pill ${report ? (report.evidence_gate.passed ? 'approved' : 'insufficient') : 'testing'}`;
+      const evidence = state.evidence || []; const hypotheses = state.hypotheses || [];
+      const depths = new Map(); const byId = new Map(hypotheses.map(item => [item.hypothesis_id, item]));
+      const depthOf = item => {
+        if (depths.has(item.hypothesis_id)) return depths.get(item.hypothesis_id);
+        let depth = 0; let parent = byId.get(item.parent_hypothesis_id); const visited = new Set();
+        while (parent && !visited.has(parent.hypothesis_id)) { visited.add(parent.hypothesis_id); depth += 1; parent = byId.get(parent.parent_hypothesis_id); }
+        depths.set(item.hypothesis_id, depth); return depth;
+      };
+      const leafSupported = [...hypotheses].reverse().find(item => item.status === 'SUPPORTED');
+      const chainByHypothesis = new Map();
+      if (report && leafSupported) chainByHypothesis.set(leafSupported.hypothesis_id, (report.root_cause_chain || []).filter(item => item.classification === 'INFERRED'));
+      const html = hypotheses.map(item => {
+        const display = statusDisplay(item.status);
+        const related = evidence.filter(fact => (fact.supports || []).includes(item.hypothesis_id) || (fact.contradicts || []).includes(item.hypothesis_id));
+        const inferred = chainByHypothesis.get(item.hypothesis_id) || [];
+        const intent = !report && state.current_intent && state.current_intent.hypothesis_id === item.hypothesis_id ? state.current_intent : null;
+        const evidenceHtml = related.map(evidenceMarkup).join('') + inferred.map(inferredMarkup).join('');
+        const seekingHtml = intent ? `<div class="seeking"><strong>Seeking now: ${escapeHtml(intent.evidence_sought)}</strong>${escapeHtml(intent.reason)}${intent.selected_tool ? ` · Tool: ${escapeHtml(intent.selected_tool)}` : ''}</div>` : '';
+        let decision = '';
+        if (item.status === 'REJECTED') decision = `<div class="decision-note rejected-note"><strong>Rejected:</strong> ${escapeHtml(item.rejection_reason || 'Observed evidence contradicted this hypothesis.')}</div>`;
+        if (item.status === 'SUPPORTED') decision = '<div class="decision-note approved-note"><strong>Approved:</strong> the collected evidence supports this explanation.</div>';
+        if (item.status === 'INSUFFICIENT_EVIDENCE') decision = '<div class="decision-note"><strong>Unresolved:</strong> available evidence did not meet the gate.</div>';
+        const empty = !evidenceHtml && !seekingHtml ? `<div class="empty-evidence">${item.status === 'NEW' ? 'Waiting to investigate.' : 'No linked evidence was returned.'}</div>` : '';
+        return `<li class="hypothesis-step is-${display.css}" style="--depth:${depthOf(item)}"><div class="hypothesis-title"><h3>${escapeHtml(item.description)}</h3><span class="status-pill ${display.css}">${display.label}</span></div><div class="hypothesis-meta">Evidence Support Score: ${escapeHtml(item.support_score)} · Priority: ${escapeHtml(item.investigation_priority)}</div>${seekingHtml}${evidenceHtml ? `<ul class="evidence-branch">${evidenceHtml}</ul>` : ''}${empty}${decision}</li>`;
+      }).join('');
+      document.querySelector('#investigation-path').innerHTML = html || '<li class="hypothesis-step is-testing"><div class="hypothesis-title"><h3>Framing the question and discovering available tools</h3><span class="status-pill testing">TESTING</span></div></li>';
+      status.textContent = `Investigation ${state.investigation_id}: ${(state.status || 'RUNNING').replaceAll('_', ' ')}`;
     }
-    if (state.status === 'FAILED') throw new Error('Investigation failed. Check the server log.');
-    let reportResponse;
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      reportResponse = await fetch(`/investigations/${started.investigation_id}/report`);
-      if (reportResponse.ok) break;
-      if (reportResponse.status !== 409) throw new Error(await reportResponse.text());
-      await new Promise(resolve => setTimeout(resolve, 100));
+
+    function evidenceMarkup(item) {
+      const provenance = [item.tool_name, item.query_id, item.source].filter(Boolean).map(escapeHtml).join(' → ');
+      const relationship = (item.contradicts || []).length ? 'Contradicting evidence' : 'Supporting evidence';
+      const classification = item.classification || 'OBSERVED';
+      const css = classification === 'INFERRED' ? 'inferred' : 'observed';
+      return `<li class="evidence-item"><div class="evidence-topline"><span class="label ${css}">${escapeHtml(classification)}</span><span class="label queued">${escapeHtml(item.evidence_type)}</span></div><p class="evidence-statement">${escapeHtml(item.statement)}</p><div class="provenance">${relationship}${provenance ? ` · ${provenance}` : ''}</div></li>`;
     }
-    if (!reportResponse.ok) throw new Error('Final report was not ready in time.');
-    const report = await reportResponse.json();
-    document.querySelector('#confidence').textContent = `${Math.round(report.confidence.overall * 100)}%`;
-    document.querySelector('#calls').textContent = report.statistics.tool_calls;
-    document.querySelector('#gate').textContent = report.evidence_gate.passed ? 'PASSED' : 'FAILED';
-    document.querySelector('#dimensions').innerHTML = `<span class="badge">Strength ${Math.round(report.confidence.evidence_strength * 100)}</span><span class="badge">Coverage ${Math.round(report.confidence.coverage * 100)}</span><span class="badge">Consistency ${Math.round(report.confidence.consistency * 100)}</span>`;
-    document.querySelector('#conclusion').textContent = report.conclusions[0];
-    document.querySelector('#chain').innerHTML = report.root_cause_chain.map(item => `<li><span class="badge">${escapeHtml(item.classification)}</span>${escapeHtml(item.statement)}<br><small class="muted">Evidence: ${item.evidence_ids.map(escapeHtml).join(', ')}</small></li>`).join('');
-    document.querySelector('#rejected').innerHTML = report.rejected_hypotheses.length ? report.rejected_hypotheses.map(item => `<div class="rejected"><span class="badge">REJECTED</span><strong>${escapeHtml(item.description)}</strong><p>${escapeHtml(item.rejection_reason || 'Contradicted by observed evidence.')}</p><small class="muted">Contradicting evidence: ${item.contradicting_evidence_ids.map(escapeHtml).join(', ')}</small></div>`).join('') : '<p class="muted">No hypotheses were rejected.</p>';
-    const impact = report.business_impact;
-    document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${impact.understatement.toLocaleString()} ${impact.unit} (${impact.understatement_percent}% understatement)`;
-    document.querySelector('#evidence').innerHTML = report.evidence.map(item => `<div class="evidence"><span class="badge">${escapeHtml(item.classification)}</span><span class="badge">${escapeHtml(item.evidence_type)}</span><span class="badge">${escapeHtml(item.tool_name)}</span><p>${escapeHtml(item.statement)}</p><small class="muted">${escapeHtml(item.source)} · ${escapeHtml(item.query_id)} · supports ${item.supports.map(escapeHtml).join(', ') || 'none'} · contradicts ${item.contradicts.map(escapeHtml).join(', ') || 'none'}</small></div>`).join('');
-    document.querySelector('#recommendation').textContent = report.recommendation;
-    result.hidden = false; status.textContent = `Investigation ${report.investigation_id} completed.`;
-  } catch (error) { status.className = 'error'; status.textContent = error.message; }
-  finally { button.disabled = false; }
-});
-function renderProgress(state) {
-  const intent = state.current_intent;
-  document.querySelector('#intent').innerHTML = intent ? `<strong>${escapeHtml(intent.hypothesis || intent.question)}</strong><p>Seeking: ${escapeHtml(intent.evidence_sought)}</p><small class="muted">Tool: ${escapeHtml(intent.selected_tool)} · ${escapeHtml(intent.reason)}</small>` : '<span class="muted">Evidence Gate is deciding whether the investigation is sufficient.</span>';
-  document.querySelector('#hypotheses').innerHTML = state.hypotheses.map(item => `<div class="hypothesis"><span class="badge">${escapeHtml(item.status)}</span><span class="badge">Priority ${escapeHtml(item.investigation_priority)}</span><strong>${escapeHtml(item.description)}</strong><p>Evidence Support Score: ${item.support_score}</p><small class="muted">Next evidence: ${item.next_evidence_needed.map(escapeHtml).join('; ') || 'none'}</small></div>`).join('');
-  document.querySelector('#timeline').innerHTML = state.events.map(item => `<div class="event"><span class="badge">${escapeHtml(item.event_type)}</span>${escapeHtml(item.message)}</div>`).join('');
-  status.textContent = `Investigation ${state.investigation_id}: ${state.status}`;
-}
-function escapeHtml(value) { const node = document.createElement('div'); node.textContent = value ?? ''; return node.innerHTML; }
-</script>
+
+    function inferredMarkup(item) {
+      return `<li class="evidence-item"><div class="evidence-topline"><span class="label inferred">INFERRED</span><span class="label queued">CAUSAL LINK</span></div><p class="evidence-statement">${escapeHtml(item.statement)}</p><div class="provenance">Derived from evidence: ${(item.evidence_ids || []).map(escapeHtml).join(', ')}</div></li>`;
+    }
+
+    function statusDisplay(value) {
+      const labels = {SUPPORTED: {label: 'APPROVED', css: 'approved'}, REJECTED: {label: 'REJECTED', css: 'rejected'}, INVESTIGATING: {label: 'TESTING', css: 'testing'}, INSUFFICIENT_EVIDENCE: {label: 'INSUFFICIENT', css: 'insufficient'}, NEW: {label: 'QUEUED', css: 'queued'}};
+      return labels[value] || {label: value || 'QUEUED', css: 'queued'};
+    }
+
+    function renderSummary(report) {
+      const confidence = report.confidence;
+      document.querySelector('#confidence').textContent = `${Math.round(confidence.overall * 100)}%`;
+      document.querySelector('#confidence-detail').textContent = `Strength ${Math.round(confidence.evidence_strength * 100)} · Coverage ${Math.round(confidence.coverage * 100)} · Consistency ${Math.round(confidence.consistency * 100)}`;
+      document.querySelector('#calls').textContent = report.statistics.tool_calls;
+      document.querySelector('#gate').textContent = report.evidence_gate.passed ? 'PASSED' : 'FAILED';
+      document.querySelector('#gate-detail').textContent = report.evidence_gate.reasons.join(' · ') || 'Evidence gate evaluated';
+      document.querySelector('#conclusion').textContent = report.conclusions[0];
+      const impact = report.business_impact;
+      document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${Number(impact.understatement).toLocaleString()} ${impact.unit} (${impact.understatement_percent}% understatement)`;
+      document.querySelector('#recommendation').textContent = report.recommendation;
+    }
+
+    function escapeHtml(value) { const node = document.createElement('div'); node.textContent = value ?? ''; return node.innerHTML; }
+  </script>
 </body>
 </html>
