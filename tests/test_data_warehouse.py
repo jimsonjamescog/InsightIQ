@@ -46,6 +46,20 @@ def test_all_de3_warehouse_tools_execute(tmp_path: Path):
     assert results["calculate_business_impact"].result["understatement"] == 48000
 
 
+def test_custom_region_failure_scenario(tmp_path: Path):
+    path = tmp_path / "insightiq.duckdb"
+    profile = build_warehouse(path, scenario="custom_region_failure")
+
+    assert profile.incident_reported_revenue == 0.0
+    assert round(profile.incident_region_null_rate, 3) == 1.0
+    assert validate_warehouse(path, scenario="custom_region_failure") == []
+
+    registry = build_warehouse_registry(DuckDBRunner(path))
+    impact = registry.execute("calculate_business_impact", {"metric": "revenue"})
+    assert impact.result["reported_value"] == 0.0
+    assert impact.result["understatement"] == 120000.0
+
+
 def test_warehouse_investigation_path(tmp_path: Path):
     from insightiq.agent.investigator import Investigator
     from insightiq.agent.providers import DeterministicDecisionProvider

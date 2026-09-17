@@ -49,6 +49,22 @@ def understand_question(question: str) -> QuestionContext:
             dimension="region",
             field="customer_region",
             object_name="daily_revenue",
+            profile="regional_revenue" if field else "revenue",
+        )
+    broad_business_question = (
+        any(term in text for term in ("business", "company"))
+        and any(
+            term in text
+            for term in ("change", "happened", "performance", "results", "root cause", "impact")
+        )
+    )
+    if broad_business_question:
+        return QuestionContext(
+            domains=["revenue", "orders", "operations", "data_quality"],
+            metric="revenue",
+            dimension="region",
+            field="customer_region",
+            object_name="daily_revenue",
             profile="revenue",
         )
     return QuestionContext(domains=["operations"], profile="unknown")
@@ -104,7 +120,7 @@ def generate_hypotheses(
         tuple[str, str, list[EvidenceRequirement], InvestigationPriority, str | None]
     ]
 
-    if context.profile == "revenue":
+    if context.profile in {"revenue", "regional_revenue"}:
         specifications = [
             (
                 "demand_decline",
@@ -163,6 +179,24 @@ def generate_hypotheses(
                 "What caused the customer-region data-quality failure?",
             ),
         ]
+        if context.profile == "regional_revenue":
+            specifications.insert(
+                0,
+                (
+                    "regional_pattern",
+                    "The lost revenue is concentrated in one or more geographic regions.",
+                    [
+                        requirement(
+                            "segment_metric",
+                            "Compare revenue across regions.",
+                            {"metric": "revenue", "dimension": "region"},
+                            1.0,
+                        )
+                    ],
+                    InvestigationPriority.HIGH,
+                    None,
+                )
+            )
     elif context.profile in {"regional_orders", "orders"}:
         specifications = [
             (
