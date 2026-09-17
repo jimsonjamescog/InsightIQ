@@ -59,6 +59,12 @@
     .evidence, .rejected { padding: 14px; margin: 10px 0; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; }
     .rejected { border-left-color: var(--red); }
     .evidence p, .rejected p { margin: 10px 0 7px; }
+    .provenance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .provenance div { min-width: 0; }
+    .provenance-label { display: block; color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; margin-bottom: 3px; }
+    details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+    summary { color: var(--blue); cursor: pointer; font-size: 12px; font-weight: 700; }
+    pre { margin: 10px 0 0; padding: 12px; overflow: auto; background: #0a0f14; border: 1px solid var(--line); border-radius: 4px; color: #cbd4dd; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
     .chain { margin: 0; padding-left: 28px; }
     .chain li { padding: 0 0 18px 8px; }
     .error { color: var(--red); }
@@ -75,6 +81,7 @@
       .hypothesis { grid-template-columns: auto 1fr; }
       .score { grid-column: 2; }
       .event { grid-template-columns: 1fr; gap: 5px; }
+      .provenance { grid-template-columns: 1fr; }
       .tabs { overflow-x: auto; }
     }
   </style>
@@ -185,7 +192,12 @@ form.addEventListener('submit', async (event) => {
     document.querySelector('#rejected').innerHTML = report.rejected_hypotheses.length ? report.rejected_hypotheses.map(item => `<div class="rejected"><span class="badge">REJECTED</span><strong>${escapeHtml(item.description)}</strong><p>${escapeHtml(item.rejection_reason || 'Contradicted by observed evidence.')}</p><small class="muted">Contradicting evidence: ${item.contradicting_evidence_ids.map(escapeHtml).join(', ')}</small></div>`).join('') : '<p class="muted">No hypotheses were rejected.</p>';
     const impact = report.business_impact;
     document.querySelector('#impact').textContent = impact.understatement == null ? 'Not established' : `${new Intl.NumberFormat('en-US', {style: 'currency', currency: impact.unit || 'USD', maximumFractionDigits: 0}).format(impact.understatement)} lost revenue (${impact.understatement_percent}% impact)`;
-    document.querySelector('#evidence').innerHTML = report.evidence.map(item => `<div class="evidence"><span class="badge">${escapeHtml(item.classification)}</span><span class="badge">${escapeHtml(item.evidence_type)}</span><span class="badge">${escapeHtml(item.tool_name)}</span><p>${escapeHtml(item.statement)}</p><small class="muted">${escapeHtml(item.source)} · ${escapeHtml(item.query_id)} · supports ${item.supports.map(escapeHtml).join(', ') || 'none'} · contradicts ${item.contradicts.map(escapeHtml).join(', ') || 'none'}</small></div>`).join('');
+    const toolResults = new Map(state.tool_results.map(item => [item.execution_id, item]));
+    document.querySelector('#evidence').innerHTML = report.evidence.map(item => {
+      const toolResult = toolResults.get(item.execution_id);
+      const derivedFrom = item.derived_from.length ? item.derived_from.join(', ') : item.execution_id;
+      return `<article class="evidence"><span class="badge">${escapeHtml(item.classification)}</span><span class="badge">${escapeHtml(item.evidence_type)}</span><span class="badge">${escapeHtml(item.tool_name)}</span><p>${escapeHtml(item.statement)}</p><div class="provenance"><div><span class="provenance-label">Derived from</span><small>${escapeHtml(derivedFrom)}</small></div><div><span class="provenance-label">Tool execution</span><small>${escapeHtml(item.execution_id)}</small></div><div><span class="provenance-label">Query</span><small>${escapeHtml(item.query_id)}</small></div></div><small class="muted">Source: ${escapeHtml(item.source)} · Supports: ${item.supports.map(escapeHtml).join(', ') || 'none'} · Contradicts: ${item.contradicts.map(escapeHtml).join(', ') || 'none'}</small>${toolResult ? `<details><summary>View tool result and data</summary><pre>${escapeHtml(JSON.stringify({arguments: toolResult.arguments, data: toolResult.result}, null, 2))}</pre></details>` : ''}</article>`;
+    }).join('');
     document.querySelector('#recommendation').textContent = report.recommendation;
     result.hidden = false; status.className = 'success'; status.textContent = `Investigation completed · ${report.investigation_id}`;
   } catch (error) { status.className = 'error'; status.textContent = error.message; }
