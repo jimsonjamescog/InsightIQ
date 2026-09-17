@@ -29,7 +29,7 @@ def test_repeatedly_recovers_expected_root_cause(tmp_path: Path):
         )
         assert state.status == InvestigationStatus.COMPLETED
         assert report.evidence_gate.passed
-        assert "customer-region transformation regression" in report.conclusions[0]
+        assert "deployment defect" in report.conclusions[0]
         assert report.confidence.overall >= 0.75
         assert all(
             evidence.execution_id and evidence.query_id and evidence.source
@@ -61,7 +61,9 @@ def test_negative_scenarios_do_not_establish_root_cause(tmp_path: Path, scenario
 
 def test_conflicting_evidence_is_explicitly_rejected(tmp_path: Path):
     state, report = investigate(tmp_path / "conflict.duckdb", ScenarioName.CONFLICTING_EVIDENCE)
-    data_hypothesis = next(item for item in state.hypotheses if item.hypothesis_id == "H4")
+    data_hypothesis = next(
+        item for item in state.hypotheses if item.hypothesis_type == "data_quality_failure"
+    )
 
     assert data_hypothesis.status == HypothesisStatus.REJECTED
     assert data_hypothesis.supporting_evidence
@@ -71,12 +73,12 @@ def test_conflicting_evidence_is_explicitly_rejected(tmp_path: Path):
 
 def test_payment_failure_can_be_the_supported_root_cause(tmp_path: Path):
     state, report = investigate(tmp_path / "payment.duckdb", ScenarioName.PAYMENT_FAILURE)
-    statuses = {item.hypothesis_id: item.status for item in state.hypotheses}
+    statuses = {item.hypothesis_type: item.status for item in state.hypotheses}
 
     assert state.status == InvestigationStatus.COMPLETED
     assert report.evidence_gate.passed
-    assert statuses["H2"] == HypothesisStatus.SUPPORTED
-    assert statuses["H4"] == HypothesisStatus.REJECTED
+    assert statuses["payment_failure"] == HypothesisStatus.SUPPORTED
+    assert statuses["data_quality_failure"] == HypothesisStatus.REJECTED
     assert "payment failures" in report.conclusions[0]
     assert {link.classification for link in report.root_cause_chain} == {
         EvidenceClassification.OBSERVED,

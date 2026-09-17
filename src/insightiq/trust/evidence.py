@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insightiq.models import Evidence, EvidenceClassification, ToolResult, new_id
+from insightiq.models import Evidence, EvidenceClassification, EvidenceFinding, ToolResult, new_id
 
 STATEMENT_BUILDERS = {
     "get_kpi": lambda r: f"{r['metric']} is {r['value']} {r['unit']} for {r['period']}.",
@@ -76,6 +76,32 @@ class EvidenceStore:
             supports=supports or [],
             contradicts=contradicts or [],
             strength=strength,
+        )
+
+    def from_finding(
+        self,
+        result: ToolResult,
+        finding: EvidenceFinding,
+        *,
+        supports: list[str],
+        contradicts: list[str],
+    ) -> Evidence:
+        self.record_execution(result)
+        return Evidence(
+            evidence_id=new_id("evidence"),
+            classification=EvidenceClassification.OBSERVED,
+            evidence_type=finding.evidence_type,
+            observation_type=result.tool_name,
+            statement=finding.statement,
+            tool_name=result.tool_name,
+            execution_id=result.execution_id,
+            query_id=result.query_id,
+            source=result.source,
+            timestamp=result.timestamp,
+            supports=supports,
+            contradicts=contradicts,
+            signal_types=list(dict.fromkeys([*finding.supports_types, *finding.contradicts_types])),
+            strength=finding.strength,
         )
 
     def validate(self, evidence: Evidence) -> tuple[bool, list[str]]:

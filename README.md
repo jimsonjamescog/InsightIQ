@@ -28,6 +28,13 @@ The included scenario investigates a 40% reported-revenue drop caused by a deplo
 - Typed observed/inferred causal links with link-level evidence references
 - Five negative scenario variants and ten-run investigation regression coverage
 - Rejected-hypothesis explanations in the demo UI
+- Generic question understanding and dynamic hypothesis contracts
+- Capability-based Tool Registry discovery with schemas, domains, evidence types, and cost hints
+- Evidence-gap prioritization using deterministic investigation priority and information value
+- Recursive follow-up investigations for supported but incomplete explanations
+- Live background investigation API and polling UI showing intent, evidence, and belief updates
+- Generic-investigator acceptance coverage for revenue, regional orders, data completeness,
+  recursion, insufficiency, and new-tool discovery
 - Unit and integration tests
 - Docker and GitHub Actions configuration
 
@@ -44,6 +51,18 @@ uvicorn insightiq.api.main:app --reload
 ```
 
 Open [http://localhost:8000](http://localhost:8000). The default `deterministic` mode runs locally with the built-in scenario.
+
+Try questions that produce different hypotheses and investigation paths:
+
+```text
+Why did revenue drop yesterday?
+Why did Northeast order volume fall yesterday?
+Why did customer region data become incomplete?
+Why did employee happiness change?
+```
+
+The last question intentionally demonstrates `INSUFFICIENT_EVIDENCE` because the registered
+enterprise environment has no capability that can responsibly answer it.
 
 On first startup, InsightIQ creates `data/insightiq.duckdb`. You can explicitly manage it with:
 
@@ -89,6 +108,8 @@ The OpenAI path uses custom function tools through the Responses API. Tool execu
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `POST` | `/investigations` | Run an investigation |
+| `POST` | `/investigations/start` | Start a live background investigation |
+| `GET` | `/tools` | Discover registered tool contracts and capabilities |
 | `GET` | `/investigations/{id}` | Read investigation state |
 | `GET` | `/investigations/{id}/evidence` | Read evidence and provenance |
 | `GET` | `/investigations/{id}/graph` | Read graph nodes and edges |
@@ -116,6 +137,12 @@ Question -> Investigator -> Allowlisted tools -> Evidence store
                                    v
                          Investigation report
 ```
+
+The Investigator loop contains no KPI, revenue, payment, region, deployment, or data-quality
+branches. Question-specific hypotheses and evidence requirements come from declarative enterprise
+context. Tools are selected by matching those requirements to capabilities advertised by the Tool
+Registry. Tool-specific interpretation remains with each registered tool, so a new matching tool
+does not require an Investigator change.
 
 The project uses an in-memory repository for the MVP. Replace it with durable storage before running multiple application instances.
 
@@ -148,6 +175,8 @@ OPERATIONS   deployments, pipeline runs, schema changes, lineage, incidents, doc
 The injected scenario preserves actual revenue at `$120,000` while a customer-region mapping regression causes the reporting model to emit `$72,000`. Traffic, payments, pipeline status, and unrelated deployments provide plausible decoys.
 
 See [`docs/data-engineering.md`](docs/data-engineering.md) for ownership, contracts, warehouse setup, and Snowflake instructions.
+See [`docs/generic-investigator.md`](docs/generic-investigator.md) for planning, recursion,
+tool discovery, live progress, and the implementation freeze.
 
 Every backend returns the same `ToolResult` envelope:
 
@@ -177,6 +206,16 @@ Then set `INSIGHTIQ_DATA_BACKEND=snowflake`. Keep metric names, dimensions, and 
 - Confidence is calculated in code.
 - A failed evidence gate returns **Root cause not established**.
 - Hidden ground truth is evaluation-only.
+
+## Implementation freeze
+
+The bundled revenue mystery is a test fixture, not the investigation algorithm. The known
+enterprise context, registry metadata, schemas, deterministic scoring rules, and scenarios are
+configured. Hypotheses, evidence gaps, tool selection, investigation path, recursive questions,
+conclusions, and root-cause chains are produced at runtime.
+
+The central stopping rule is: investigate the most valuable unresolved question next, and stop
+only when the Evidence Gate finds sufficient evidence or the available evidence runs out.
 
 ## Current MVP limitations
 

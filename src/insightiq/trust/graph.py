@@ -16,8 +16,16 @@ def build_graph(state: InvestigationState) -> GraphExport:
             type="HYPOTHESIS",
             label=hypothesis.description,
             status=hypothesis.status.value,
+            support_score=hypothesis.support_score,
+            investigation_priority=hypothesis.investigation_priority.value,
         )
         graph.add_edge(question_id, hypothesis.hypothesis_id, type="GENERATED")
+        if hypothesis.parent_hypothesis_id:
+            graph.add_edge(
+                hypothesis.parent_hypothesis_id,
+                hypothesis.hypothesis_id,
+                type="DEPENDS_ON",
+            )
 
     for evidence in state.evidence:
         graph.add_node(
@@ -25,6 +33,7 @@ def build_graph(state: InvestigationState) -> GraphExport:
             type="EVIDENCE",
             label=evidence.statement,
             classification=evidence.classification.value,
+            evidence_type=evidence.evidence_type.value,
             source=evidence.source,
         )
         if evidence.execution_id:

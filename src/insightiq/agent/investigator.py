@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Callable
 
 from insightiq.agent.providers import DecisionProvider
 from insightiq.models import (
     ConfidenceBreakdown,
+    EvidenceFinding,
     Hypothesis,
     HypothesisStatus,
+    InvestigationEvent,
+    InvestigationOutcome,
+    InvestigationPriority,
     InvestigationReport,
     InvestigationState,
     InvestigationStatistics,
@@ -20,20 +24,7 @@ from insightiq.trust.confidence import calculate_confidence, evaluate_gate
 from insightiq.trust.evidence import EvidenceStore
 
 logger = logging.getLogger("insightiq.investigator")
-
-DATA_HYPOTHESIS = "H4"
-
-
-def initial_hypotheses() -> list[Hypothesis]:
-    return [
-        Hypothesis(hypothesis_id="H1", description="Customer demand or traffic decreased."),
-        Hypothesis(hypothesis_id="H2", description="Payment failures caused lost revenue."),
-        Hypothesis(hypothesis_id="H3", description="Regional business performance declined."),
-        Hypothesis(
-            hypothesis_id=DATA_HYPOTHESIS,
-            description="A reporting or data-quality regression excluded valid transactions.",
-        ),
-    ]
+ProgressCallback = Callable[[InvestigationState], None]
 
 
 class Investigator:
@@ -53,13 +44,32 @@ class Investigator:
         self.confidence_threshold = confidence_threshold
         self.evidence_store = EvidenceStore()
 
-    def investigate(self, question: str) -> tuple[InvestigationState, InvestigationReport]:
-        started = time.perf_counter()
+    def create_state(
+        self, question: str, investigation_id: str | None = None
+    ) -> InvestigationState:
         state = InvestigationState(
-            investigation_id=new_id("inv"),
+            investigation_id=investigation_id or new_id("inv"),
             question=question,
-            hypotheses=initial_hypotheses(),
         )
+        self.provider.initialize(state, self.registry)
+        self._record_event(
+            state,
+            "HYPOTHESES_GENERATED",
+            f"Generated {len(state.hypotheses)} question-specific competing hypotheses.",
+        )
+        return state
+
+    def investigate(
+        self,
+        question: str,
+        *,
+        state: InvestigationState | None = None,
+        progress_callback: ProgressCallback | None = None,
+        step_delay: float = 0,
+    ) -> tuple[InvestigationState, InvestigationReport]:
+        started = time.perf_counter()
+        state = state or self.create_state(question)
+        self._publish(state, progress_callback, step_delay)
         logger.info("investigation_started", extra={"investigation_id": state.investigation_id})
 
         proposal = None
@@ -70,19 +80,29 @@ class Investigator:
             if decision.final_proposal:
                 proposal = decision.final_proposal
                 break
-            if not decision.tool_request:
+            if not decision.tool_request or state.tool_calls >= self.max_tool_calls:
                 break
-            if state.tool_calls >= self.max_tool_calls:
-                break
+
+            state.current_intent = decision.investigation_intent
+            self._record_event(
+                state,
+                "EVIDENCE_SEEKING",
+                decision.reasoning_summary,
+                intent=decision.investigation_intent,
+                hypothesis_id=(
+                    decision.investigation_intent.hypothesis_id
+                    if decision.investigation_intent
+                    else None
+                ),
+                tool_name=decision.tool_request.name,
+            )
+            self._publish(state, progress_callback, step_delay)
 
             signature = (
                 f"{decision.tool_request.name}:{sorted(decision.tool_request.arguments.items())}"
             )
             seen_requests[signature] = seen_requests.get(signature, 0) + 1
             if seen_requests[signature] > 2:
-                logger.warning(
-                    "repeated_tool_request", extra={"investigation_id": state.investigation_id}
-                )
                 break
 
             result = self.registry.execute(
@@ -91,27 +111,42 @@ class Investigator:
             )
             state.tool_calls += 1
             state.tool_results.append(result)
-            evidence = self._interpret_result(state, result.tool_name, result.result)
-            state.evidence.append(
-                self.evidence_store.from_tool_result(
+            self._satisfy_requirement(state, decision.investigation_intent, result.tool_name)
+            findings = self.registry.interpret(result)
+            if not findings:
+                findings = [
+                    EvidenceFinding(
+                        statement=f"{result.tool_name} returned a traceable result.",
+                        evidence_type="HISTORICAL",
+                        strength=0.5,
+                    )
+                ]
+            for finding in findings:
+                supports, contradicts = self._match_hypotheses(state, finding)
+                evidence = self.evidence_store.from_finding(
                     result,
-                    supports=evidence["supports"],
-                    contradicts=evidence["contradicts"],
-                    strength=evidence["strength"],
+                    finding,
+                    supports=supports,
+                    contradicts=contradicts,
                 )
-            )
-            state.observations.append(state.evidence[-1].statement)
-            self._update_hypotheses(state, result.tool_name)
-            if result.tool_name == "calculate_business_impact":
+                state.evidence.append(evidence)
+                state.observations.append(evidence.statement)
+                self._record_event(
+                    state,
+                    "EVIDENCE_OBSERVED",
+                    evidence.statement,
+                    evidence_id=evidence.evidence_id,
+                    tool_name=result.tool_name,
+                )
+            if any(item.evidence_type.value == "BUSINESS_IMPACT" for item in findings):
                 state.business_impact = result.result
-            logger.info(
-                "tool_completed",
-                extra={
-                    "investigation_id": state.investigation_id,
-                    "tool_name": result.tool_name,
-                    "query_id": result.query_id,
-                },
+            self._recalculate_hypotheses(state)
+            self._record_event(
+                state,
+                "HYPOTHESES_UPDATED",
+                "Recalculated evidence support scores and hypothesis states.",
             )
+            self._publish(state, progress_callback, step_delay)
 
         if proposal:
             state.root_cause_chain = proposal.root_cause_chain
@@ -130,95 +165,164 @@ class Investigator:
             state.business_impact,
             target_hypothesis_id,
             self.confidence_threshold,
+            hypotheses=state.hypotheses,
+            impact_required=any(
+                item.capability == "calculate_impact"
+                for items in state.evidence_requirements.values()
+                for item in items
+            ),
         )
 
         if proposal and state.evidence_gate.passed:
             state.conclusion = proposal.conclusion
             state.status = InvestigationStatus.COMPLETED
+            state.outcome = InvestigationOutcome.ROOT_CAUSE_ESTABLISHED
             self._hypothesis(state, proposal.hypothesis_id).status = HypothesisStatus.SUPPORTED
         else:
             state.conclusion = "Root cause not established"
             state.status = InvestigationStatus.INSUFFICIENT_EVIDENCE
+            state.outcome = InvestigationOutcome.INSUFFICIENT_EVIDENCE
             for hypothesis in state.hypotheses:
                 if hypothesis.status in {HypothesisStatus.NEW, HypothesisStatus.INVESTIGATING}:
                     hypothesis.status = HypothesisStatus.INSUFFICIENT_EVIDENCE
+        state.current_intent = None
+        self._record_event(
+            state,
+            "EVIDENCE_GATE_DECIDED",
+            (
+                "Evidence Gate established the root cause."
+                if state.evidence_gate.passed
+                else "Evidence Gate stopped the investigation without establishing a root cause."
+            ),
+        )
+        self._publish(state, progress_callback, 0)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         report = self._build_report(state, duration_ms)
-        logger.info(
-            "investigation_completed",
-            extra={
-                "investigation_id": state.investigation_id,
-                "status": state.status.value,
-                "confidence": state.confidence.overall,
-            },
-        )
         return state, report
 
-    def _interpret_result(
-        self, state: InvestigationState, tool: str, result: dict
-    ) -> dict[str, Any]:
+    @staticmethod
+    def _publish(
+        state: InvestigationState,
+        callback: ProgressCallback | None,
+        delay: float,
+    ) -> None:
+        if callback:
+            callback(state.model_copy(deep=True))
+        if delay:
+            time.sleep(delay)
+
+    @staticmethod
+    def _record_event(
+        state: InvestigationState,
+        event_type: str,
+        message: str,
+        **kwargs,
+    ) -> None:
+        state.events.append(
+            InvestigationEvent(
+                sequence=len(state.events) + 1,
+                event_type=event_type,
+                message=message,
+                **kwargs,
+            )
+        )
+
+    @staticmethod
+    def _satisfy_requirement(state: InvestigationState, intent, tool_name: str) -> None:
+        owner = intent.hypothesis_id if intent and intent.hypothesis_id else "__question__"
+        candidates = state.evidence_requirements.get(owner, [])
+        requirement = next(
+            (item for item in candidates if not item.satisfied and item.tool_name == tool_name),
+            None,
+        )
+        if requirement:
+            requirement.satisfied = True
+
+    @staticmethod
+    def _match_hypotheses(
+        state: InvestigationState,
+        finding: EvidenceFinding,
+    ) -> tuple[list[str], list[str]]:
         supports: list[str] = []
         contradicts: list[str] = []
-        strength = 0.9
-        if tool == "compare_periods" and result["metric"] == "revenue":
-            if result["percent_change"] <= -10:
-                supports = ["H1", "H2", "H3", DATA_HYPOTHESIS]
-        elif tool == "compare_periods" and result["metric"] == "traffic":
-            (supports if result["percent_change"] <= -10 else contradicts).append("H1")
-        elif tool == "compare_periods" and result["metric"] == "payment_failure_rate":
-            material_failure = (
-                result["current_value"] >= 0.05
-                and result["current_value"] >= result["baseline_value"] * 3
+        for hypothesis in state.hypotheses:
+            if hypothesis.hypothesis_type in finding.supports_types:
+                supports.append(hypothesis.hypothesis_id)
+            if hypothesis.hypothesis_type in finding.contradicts_types:
+                contradicts.append(hypothesis.hypothesis_id)
+        if "anomaly" in finding.supports_types or "business_impact" in finding.supports_types:
+            supports.extend(
+                item.hypothesis_id for item in state.hypotheses if item.parent_hypothesis_id is None
             )
-            (supports if material_failure else contradicts).append("H2")
-        elif tool == "segment_metric":
-            supports = ["H3"]
-        elif tool == "check_data_quality":
-            (supports if result.get("anomaly") else contradicts).append(DATA_HYPOTHESIS)
-            strength = 1.0
-        elif tool == "get_deployments":
-            relevant = any(
-                item.get("service") == "customer-transform"
-                for item in result.get("deployments", [])
-            )
-            if relevant:
-                supports = [DATA_HYPOTHESIS]
-        elif tool == "inspect_schema_changes" and result.get("changes"):
-            supports = [DATA_HYPOTHESIS]
-        elif tool == "get_dependencies" and result.get("filter_logic"):
-            supports = [DATA_HYPOTHESIS]
-            strength = 1.0
-        return {"supports": supports, "contradicts": contradicts, "strength": strength}
+        return list(dict.fromkeys(supports)), list(dict.fromkeys(contradicts))
 
-    def _update_hypotheses(self, state: InvestigationState, tool: str) -> None:
-        evidence = state.evidence[-1]
-        for hypothesis_id in evidence.supports:
-            hypothesis = self._hypothesis(state, hypothesis_id)
-            if hypothesis.status != HypothesisStatus.REJECTED:
-                hypothesis.status = HypothesisStatus.INVESTIGATING
-            hypothesis.supporting_evidence.append(evidence.evidence_id)
-        for hypothesis_id in evidence.contradicts:
-            hypothesis = self._hypothesis(state, hypothesis_id)
-            hypothesis.status = HypothesisStatus.REJECTED
-            hypothesis.contradicting_evidence.append(evidence.evidence_id)
-            if hypothesis_id == "H1":
-                hypothesis.rejection_reason = "Traffic remained at its historical baseline."
-            elif hypothesis_id == "H2":
-                hypothesis.rejection_reason = (
-                    "Payment failure rate remained near its historical baseline."
-                )
-            elif hypothesis_id == DATA_HYPOTHESIS:
-                hypothesis.rejection_reason = (
-                    "The measured data-quality result contradicts a reporting regression."
-                )
-        if tool == "get_dependencies" and evidence.supports:
-            regional = self._hypothesis(state, "H3")
-            regional.status = HypothesisStatus.REJECTED
-            regional.rejection_reason = (
-                "The regional pattern is explained by null-region filtering, not regional demand."
+    @staticmethod
+    def _recalculate_hypotheses(state: InvestigationState) -> None:
+        for hypothesis in state.hypotheses:
+            supporting = [
+                item for item in state.evidence if hypothesis.hypothesis_id in item.supports
+            ]
+            contradicting = [
+                item for item in state.evidence if hypothesis.hypothesis_id in item.contradicts
+            ]
+            hypothesis.supporting_evidence_ids = [item.evidence_id for item in supporting]
+            hypothesis.contradicting_evidence_ids = [item.evidence_id for item in contradicting]
+            hypothesis.support_score = round(
+                max(
+                    0,
+                    min(
+                        100,
+                        15
+                        + sum(item.strength * 45 for item in supporting)
+                        - sum(item.strength * 60 for item in contradicting),
+                    ),
+                ),
+                1,
             )
-            regional.contradicting_evidence.append(evidence.evidence_id)
+            requirements = state.evidence_requirements.get(hypothesis.hypothesis_id, [])
+            required_evidence_collected = bool(requirements) and all(
+                item.satisfied or item.unavailable for item in requirements
+            )
+            has_specific_support = any(
+                hypothesis.hypothesis_type in item.signal_types for item in supporting
+            )
+            hypothesis.next_evidence_needed = [
+                item.description
+                for item in requirements
+                if not item.satisfied and not item.unavailable
+            ]
+            strong_contradiction = next(
+                (item for item in contradicting if item.strength >= 0.8), None
+            )
+            if strong_contradiction:
+                hypothesis.status = HypothesisStatus.REJECTED
+                hypothesis.rejection_reason = strong_contradiction.statement
+            elif (
+                hypothesis.support_score >= 65
+                and len(supporting) >= 2
+                and required_evidence_collected
+                and has_specific_support
+            ):
+                hypothesis.status = HypothesisStatus.SUPPORTED
+            elif required_evidence_collected:
+                hypothesis.status = HypothesisStatus.INSUFFICIENT_EVIDENCE
+            elif supporting:
+                hypothesis.status = HypothesisStatus.INVESTIGATING
+            else:
+                hypothesis.status = HypothesisStatus.NEW
+            if hypothesis.status in {
+                HypothesisStatus.REJECTED,
+                HypothesisStatus.INSUFFICIENT_EVIDENCE,
+            }:
+                hypothesis.investigation_priority = InvestigationPriority.LOW
+            elif hypothesis.status in {
+                HypothesisStatus.SUPPORTED,
+                HypothesisStatus.INVESTIGATING,
+            }:
+                hypothesis.investigation_priority = InvestigationPriority.HIGH
+            else:
+                hypothesis.investigation_priority = InvestigationPriority.MEDIUM
 
     @staticmethod
     def _hypothesis(state: InvestigationState, hypothesis_id: str) -> Hypothesis:
@@ -230,11 +334,14 @@ class Investigator:
             evidence_strength=0, coverage=0, consistency=0, overall=0
         )
         assert state.evidence_gate is not None
+        assert state.outcome is not None
         return InvestigationReport(
             investigation_id=state.investigation_id,
             question=state.question,
             observations=state.observations,
             hypotheses=state.hypotheses,
+            follow_up_questions=state.follow_up_questions,
+            events=state.events,
             rejected_hypotheses=[
                 item for item in state.hypotheses if item.status == HypothesisStatus.REJECTED
             ],
@@ -245,6 +352,7 @@ class Investigator:
             business_impact=state.business_impact,
             confidence=confidence,
             evidence_gate=state.evidence_gate,
+            outcome=state.outcome,
             recommendation=state.recommendation
             or "Gather the missing evidence and rerun the investigation.",
             statistics=InvestigationStatistics(

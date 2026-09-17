@@ -1,3 +1,5 @@
+import time
+
 from fastapi.testclient import TestClient
 
 from insightiq.api.main import app
@@ -15,6 +17,39 @@ def test_demo_exposes_rejected_hypotheses():
     response = client.get("/")
     assert response.status_code == 200
     assert "Rejected hypotheses" in response.text
+    assert "Current investigation" in response.text
+
+
+def test_tool_registry_metadata_is_discoverable():
+    response = client.get("/tools")
+    assert response.status_code == 200
+    tool = next(item for item in response.json()["tools"] if item["name"] == "compare_periods")
+    assert tool["input_schema"]
+    assert tool["output_schema"]
+    assert tool["evidence_types"]
+    assert tool["applicable_domains"]
+    assert tool["capabilities"]
+    assert tool["cost_or_latency_hint"]
+
+
+def test_background_investigation_exposes_live_progress():
+    started = client.post(
+        "/investigations/start",
+        json={"question": "Why did customer region data become incomplete?"},
+    )
+    assert started.status_code == 202
+    investigation_id = started.json()["investigation_id"]
+
+    for _ in range(100):
+        state = client.get(f"/investigations/{investigation_id}").json()
+        if state["status"] != "RUNNING":
+            break
+        time.sleep(0.05)
+
+    assert state["events"]
+    assert any(item["event_type"] == "EVIDENCE_SEEKING" for item in state["events"])
+    assert state["status"] == "COMPLETED"
+    assert client.get(f"/investigations/{investigation_id}/report").status_code == 200
 
 
 def test_create_and_retrieve_investigation():

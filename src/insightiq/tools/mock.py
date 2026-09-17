@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from insightiq.models import ToolResult, new_id
+from insightiq.tools.findings import metadata
 from insightiq.tools.registry import ToolDefinition, ToolRegistry
 
 
@@ -22,6 +23,12 @@ class SegmentMetricInput(ToolInput):
     metric: Literal["revenue", "orders"]
     dimension: Literal["region", "channel", "product_category"]
     period: str = "yesterday"
+
+
+class DecomposeKPIInput(ToolInput):
+    metric: Literal["revenue"] = "revenue"
+    current_period: str = "yesterday"
+    baseline_period: str = "previous_28_days"
 
 
 class DataQualityInput(ToolInput):
@@ -45,6 +52,11 @@ class DependencyInput(ToolInput):
 
 class BusinessImpactInput(ToolInput):
     metric: Literal["revenue"] = "revenue"
+
+
+class IncidentSearchInput(ToolInput):
+    query: str
+    limit: int = 10
 
 
 SCENARIO: dict[str, Any] = {
@@ -117,6 +129,33 @@ def segment_metric(args: SegmentMetricInput) -> ToolResult:
         {"metric": args.metric, "dimension": args.dimension, "segments": output},
         "INSIGHTIQ.BUSINESS.REGIONAL_REVENUE",
         f"segment-{args.metric}-{args.dimension}",
+    )
+
+
+def decompose_kpi(args: DecomposeKPIInput) -> ToolResult:
+    current_revenue = SCENARIO["periods"]["revenue"]["current"]
+    baseline_revenue = SCENARIO["periods"]["revenue"]["baseline"]
+    current_orders = SCENARIO["periods"]["orders"]["current"]
+    baseline_orders = SCENARIO["periods"]["orders"]["baseline"]
+    current_aov = current_revenue / current_orders
+    baseline_aov = baseline_revenue / baseline_orders
+    return _result(
+        "decompose_kpi",
+        {
+            "metric": args.metric,
+            "current": {"revenue": current_revenue, "orders": current_orders, "aov": current_aov},
+            "baseline": {
+                "revenue": baseline_revenue,
+                "orders": baseline_orders,
+                "aov": baseline_aov,
+            },
+            "effects": {
+                "order_volume": (current_orders - baseline_orders) * baseline_aov,
+                "average_order_value": current_orders * (current_aov - baseline_aov),
+            },
+        },
+        "INSIGHTIQ.BUSINESS.DAILY_REVENUE",
+        "decompose-revenue",
     )
 
 
@@ -233,6 +272,15 @@ def calculate_business_impact(args: BusinessImpactInput) -> ToolResult:
     )
 
 
+def search_incidents(args: IncidentSearchInput) -> ToolResult:
+    return _result(
+        "search_incidents",
+        {"query": args.query, "incidents": []},
+        "INSIGHTIQ.OPERATIONS.INCIDENTS",
+        "search-incidents",
+    )
+
+
 def build_mock_registry() -> ToolRegistry:
     registry = ToolRegistry()
     definitions = [
@@ -247,6 +295,12 @@ def build_mock_registry() -> ToolRegistry:
             "Break a KPI down by an allowlisted dimension.",
             SegmentMetricInput,
             segment_metric,
+        ),
+        (
+            "decompose_kpi",
+            "Decompose revenue change into volume and price effects.",
+            DecomposeKPIInput,
+            decompose_kpi,
         ),
         (
             "check_data_quality",
@@ -279,6 +333,12 @@ def build_mock_registry() -> ToolRegistry:
             BusinessImpactInput,
             calculate_business_impact,
         ),
+        (
+            "search_incidents",
+            "Search historical incident metadata.",
+            IncidentSearchInput,
+            search_incidents,
+        ),
     ]
     for name, description, input_model, handler in definitions:
         registry.register(
@@ -287,6 +347,7 @@ def build_mock_registry() -> ToolRegistry:
                 description=description,
                 input_model=input_model,
                 handler=handler,
+                **metadata(name),
             )
         )
     return registry

@@ -11,6 +11,7 @@ import duckdb
 from pydantic import BaseModel, ConfigDict, Field
 
 from insightiq.models import ToolResult, new_id
+from insightiq.tools.findings import metadata
 from insightiq.tools.registry import ToolDefinition, ToolRegistry
 
 MetricName = Literal["revenue", "orders", "traffic", "payment_failure_rate"]
@@ -484,6 +485,7 @@ def build_warehouse_registry(runner: QueryRunner) -> ToolRegistry:
                 description=description,
                 input_model=input_model,
                 handler=handler,
+                **metadata(name),
             )
         )
     return registry

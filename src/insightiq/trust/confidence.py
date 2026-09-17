@@ -5,6 +5,8 @@ from insightiq.models import (
     Evidence,
     EvidenceClassification,
     EvidenceGateResult,
+    Hypothesis,
+    HypothesisStatus,
     RootCauseLink,
 )
 from insightiq.trust.evidence import EvidenceStore
@@ -47,6 +49,9 @@ def evaluate_gate(
     business_impact: dict,
     target_hypothesis_id: str | None = None,
     threshold: float = 0.75,
+    *,
+    hypotheses: list[Hypothesis] | None = None,
+    impact_required: bool = True,
 ) -> EvidenceGateResult:
     reasons: list[str] = []
     missing: list[str] = []
@@ -82,15 +87,19 @@ def evaluate_gate(
         ):
             missing.append(f"Observed root-cause link {link.link_id} cites inferred evidence.")
         if target_hypothesis_id and not any(
-            target_hypothesis_id in evidence_by_id[item].supports
-            for item in link.evidence_ids
-            if item in evidence_by_id
+            evidence_by_id[item].supports for item in link.evidence_ids if item in evidence_by_id
         ):
-            missing.append(
-                f"Root-cause link {link.link_id} has no evidence supporting "
-                f"{target_hypothesis_id}."
-            )
-    if not business_impact:
+            missing.append(f"Root-cause link {link.link_id} has no hypothesis-supporting evidence.")
+    unresolved = [
+        item.hypothesis_id
+        for item in hypotheses or []
+        if item.parent_hypothesis_id is None
+        and item.hypothesis_id != target_hypothesis_id
+        and item.status in {HypothesisStatus.NEW, HypothesisStatus.INVESTIGATING}
+    ]
+    if unresolved:
+        missing.append(f"Major competing hypotheses remain unresolved: {', '.join(unresolved)}.")
+    if impact_required and not business_impact:
         missing.append("Business impact has not been calculated deterministically.")
 
     if not missing:

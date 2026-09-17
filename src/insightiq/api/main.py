@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Thread
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -14,6 +15,7 @@ from insightiq.models import (
     InvestigationReport,
     InvestigationRequest,
     InvestigationState,
+    InvestigationStatus,
 )
 from insightiq.storage import InMemoryRepository, InvestigationRecord
 from insightiq.tools.factory import build_registry
@@ -31,9 +33,19 @@ def build_provider():
     return DeterministicDecisionProvider()
 
 
+def build_investigator() -> Investigator:
+    return Investigator(
+        registry,
+        build_provider(),
+        max_steps=settings.max_steps,
+        max_tool_calls=settings.max_tool_calls,
+        confidence_threshold=settings.confidence_threshold,
+    )
+
+
 app = FastAPI(
     title="InsightIQ",
-    version="0.3.0",
+    version="0.4.0",
     description="Evidence-grounded autonomous business investigation agent",
 )
 
@@ -63,16 +75,45 @@ def health() -> dict:
 
 @app.post("/investigations", response_model=InvestigationReport)
 def create_investigation(request: InvestigationRequest) -> InvestigationReport:
-    investigator = Investigator(
-        registry,
-        build_provider(),
-        max_steps=settings.max_steps,
-        max_tool_calls=settings.max_tool_calls,
-        confidence_threshold=settings.confidence_threshold,
-    )
+    investigator = build_investigator()
     state, report = investigator.investigate(request.question)
     repository.save(InvestigationRecord(state=state, report=report, graph=build_graph(state)))
     return report
+
+
+@app.post("/investigations/start", status_code=202)
+def start_investigation(request: InvestigationRequest) -> dict:
+    investigator = build_investigator()
+    state = investigator.create_state(request.question)
+    repository.save_state(state.model_copy(deep=True))
+
+    def run() -> None:
+        try:
+            final_state, report = investigator.investigate(
+                request.question,
+                state=state,
+                progress_callback=repository.save_state,
+                step_delay=0.25,
+            )
+            repository.save(
+                InvestigationRecord(
+                    state=final_state,
+                    report=report,
+                    graph=build_graph(final_state),
+                )
+            )
+        except Exception:
+            state.status = InvestigationStatus.FAILED
+            repository.save_state(state)
+            raise
+
+    Thread(target=run, daemon=True, name=f"insightiq-{state.investigation_id}").start()
+    return {"investigation_id": state.investigation_id, "status": state.status}
+
+
+@app.get("/tools")
+def list_tools() -> dict:
+    return {"tools": registry.describe()}
 
 
 def get_record(investigation_id: str) -> InvestigationRecord:
@@ -95,9 +136,13 @@ def get_evidence(investigation_id: str) -> dict:
 
 @app.get("/investigations/{investigation_id}/graph", response_model=GraphExport)
 def get_graph(investigation_id: str) -> GraphExport:
-    return get_record(investigation_id).graph
+    record = get_record(investigation_id)
+    return record.graph or build_graph(record.state)
 
 
 @app.get("/investigations/{investigation_id}/report", response_model=InvestigationReport)
 def get_report(investigation_id: str) -> InvestigationReport:
-    return get_record(investigation_id).report
+    report = get_record(investigation_id).report
+    if not report:
+        raise HTTPException(status_code=409, detail="Investigation is still running.")
+    return report
