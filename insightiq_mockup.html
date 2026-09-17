@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InsightIQ UI Mockup</title>
+  <style>
+    :root {
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #182026;
+      --muted: #62717b;
+      --line: #dce3e7;
+      --soft: #eef3f5;
+      --teal: #007f78;
+      --teal-2: #d9f1ee;
+      --red: #c9443d;
+      --red-2: #fae5e2;
+      --amber: #af6d00;
+      --amber-2: #f8ebd2;
+      --blue: #2f68b2;
+      --blue-2: #e1ebf8;
+      --green: #357a38;
+      --green-2: #e4f1e3;
+      --shadow: 0 18px 45px rgba(30, 48, 58, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(720px, 1fr);
+    }
+
+    .sidebar {
+      background: #102a2d;
+      color: #e8f2f1;
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 8px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: #29a79d;
+      color: #082526;
+      font-weight: 800;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 16px;
+    }
+
+    .brand span {
+      color: #a8c2c0;
+      font-size: 12px;
+    }
+
+    .nav-section {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-title {
+      color: #94adaa;
+      font-size: 11px;
+      text-transform: uppercase;
+      padding: 0 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: #d6e7e5;
+    }
+
+    .nav-item.active {
+      background: rgba(41, 167, 157, 0.18);
+      color: #ffffff;
+    }
+
+    .nav-icon {
+      width: 18px;
+      text-align: center;
+      color: #89d6cf;
+      font-weight: 700;
+    }
+
+    .workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+
+    .title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .select,
+    .icon-button,
+    .primary-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      min-height: 36px;
+      border-radius: 8px;
+    }
+
+    .select {
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-button {
+      width: 38px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+    }
+
+    .primary-button {
+      background: var(--teal);
+      border-color: var(--teal);
+      color: white;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+
+    main {
+      padding: 22px 24px 28px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .question-band {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .question-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+
+    .question-input input {
+      border: 0;
+      outline: 0;
+      background: transparent;
+      width: 100%;
+      min-width: 160px;
+      color: var(--ink);
+    }
+
+    .quick-prompts {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 1.2fr) minmax(300px, 0.8fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .panel-head span,
+    .caption {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      border-bottom: 1px solid var(--line);
+    }
+
+    .kpi {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .kpi:last-child {
+      border-right: 0;
+    }
+
+    .kpi label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .kpi strong {
+      display: block;
+      font-size: 22px;
+      margin-top: 4px;
+    }
+
+    .delta {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .down {
+      color: var(--red);
+      background: var(--red-2);
+    }
+
+    .up {
+      color: var(--green);
+      background: var(--green-2);
+    }
+
+    .investigation {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--teal-2);
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .step h3 {
+      margin: 2px 0 2px;
+      font-size: 14px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status {
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status.done {
+      color: var(--green);
+      background: var(--green-2);
+    }
+
+    .status.live {
+      color: var(--blue);
+      background: var(--blue-2);
+    }
+
+    .hypotheses {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+    }
+
+    .hypothesis {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .hypothesis.top {
+      border-color: rgba(0,127,120,0.35);
+      background: linear-gradient(90deg, rgba(217,241,238,0.72), #fff 60%);
+    }
+
+    .hypothesis-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .hypothesis h3 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .score {
+      font-weight: 800;
+      color: var(--teal);
+      white-space: nowrap;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--soft);
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--teal);
+    }
+
+    .evidence-list {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .chart {
+      padding: 16px;
+    }
+
+    .chart-bars {
+      height: 190px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      align-items: end;
+      border-left: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 0 0 10px;
+    }
+
+    .bar-col {
+      display: grid;
+      align-items: end;
+      height: 100%;
+      gap: 6px;
+    }
+
+    .bar-col span {
+      border-radius: 5px 5px 0 0;
+      background: var(--blue);
+      min-height: 18px;
+    }
+
+    .bar-col b {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .summary {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .root-cause {
+      border-left: 4px solid var(--teal);
+      padding: 10px 12px;
+      background: var(--teal-2);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .root-cause strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .priority {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--amber-2);
+      color: var(--amber);
+      font-weight: 800;
+    }
+
+    .action p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .ghost-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      min-height: 32px;
+      padding: 0 10px;
+      font-weight: 700;
+      color: var(--teal);
+    }
+
+    @media (max-width: 1020px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .grid,
+      .split,
+      .question-band {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-strip {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px 16px;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .kpi-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .step,
+      .action {
+        grid-template-columns: auto 1fr;
+      }
+
+      .status,
+      .ghost-button {
+        grid-column: 2;
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">IQ</div>
+        <div>
+          <strong>InsightIQ</strong>
+          <span>Autonomous investigation</span>
+        </div>
+      </div>
+
+      <nav class="nav-section" aria-label="Main navigation">
+        <div class="nav-title">Analyze</div>
+        <div class="nav-item active"><span class="nav-icon">?</span> Investigation</div>
+        <div class="nav-item"><span class="nav-icon">#</span> KPI Monitor</div>
+        <div class="nav-item"><span class="nav-icon">%</span> Segments</div>
+        <div class="nav-item"><span class="nav-icon">!</span> Data Quality</div>
+      </nav>
+
+      <nav class="nav-section" aria-label="Knowledge navigation">
+        <div class="nav-title">Context</div>
+        <div class="nav-item"><span class="nav-icon">D</span> Deployments</div>
+        <div class="nav-item"><span class="nav-icon">I</span> Incidents</div>
+        <div class="nav-item"><span class="nav-icon">S</span> Semantic Search</div>
+      </nav>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="title">
+          <h1>Revenue Drop Investigation</h1>
+          <p>Evidence-backed root cause analysis for North America revenue, Sep 16</p>
+        </div>
+        <div class="top-actions">
+          <div class="select">Last 24h <span>v</span></div>
+          <button class="icon-button" aria-label="Share">↗</button>
+          <button class="primary-button">Export brief</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="question-band" aria-label="Ask InsightIQ">
+          <div class="question-input">
+            <strong>Ask</strong>
+            <input value="Why did revenue drop yesterday in North America?" aria-label="Business question">
+          </div>
+          <div class="quick-prompts">
+            <span class="chip">Hiring this quarter</span>
+            <span class="chip">Checkout conversion</span>
+            <span class="chip">Pipeline freshness</span>
+          </div>
+        </section>
+
+        <section class="grid">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Investigation Run</h2>
+                <span>Autonomous decomposition, evidence gathering, critique, and conclusion</span>
+              </div>
+              <span class="status live">Running</span>
+            </div>
+
+            <div class="kpi-strip">
+              <div class="kpi">
+                <label>Revenue</label>
+                <strong>$1.84M</strong>
+                <span class="delta down">-14.8%</span>
+              </div>
+              <div class="kpi">
+                <label>Orders</label>
+                <strong>28.6K</strong>
+                <span class="delta down">-9.2%</span>
+              </div>
+              <div class="kpi">
+                <label>AOV</label>
+                <strong>$64.20</strong>
+                <span class="delta down">-6.1%</span>
+              </div>
+              <div class="kpi">
+                <label>Evidence confidence</label>
+                <strong>86%</strong>
+                <span class="delta up">threshold met</span>
+              </div>
+            </div>
+
+            <div class="investigation">
+              <div class="timeline">
+                <div class="step">
+                  <div class="dot">1</div>
+                  <div>
+                    <h3>Decomposed KPI movement</h3>
+                    <p>Revenue decline split across traffic, conversion, AOV, region, channel, and product family.</p>
+                  </div>
+                  <span class="status done">Done</span>
+                </div>
+                <div class="step">
+                  <div class="dot">2</div>
+                  <div>
+                    <h3>Generated competing hypotheses</h3>
+                    <p>Discount expiration, payment failures, delayed pipeline, campaign pause, and inventory constraints.</p>
+                  </div>
+                  <span class="status done">Done</span>
+                </div>
+                <div class="step">
+                  <div class="dot">3</div>
+                  <div>
+                    <h3>Gathered operational evidence</h3>
+                    <p>Queried warehouse metrics, deployment logs, support tickets, and campaign history.</p>
+                  </div>
+                  <span class="status done">Done</span>
+                </div>
+                <div class="step">
+                  <div class="dot">4</div>
+                  <div>
+                    <h3>Critiquing causal chain</h3>
+                    <p>Checking whether payment failure spike explains the observed revenue gap without unsupported jumps.</p>
+                  </div>
+                  <span class="status live">Live</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <aside class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Hypotheses</h2>
+                <span>Ranked by evidence strength</span>
+              </div>
+            </div>
+            <div class="hypotheses">
+              <div class="hypothesis top">
+                <div class="hypothesis-head">
+                  <h3>Payment authorization failures increased</h3>
+                  <span class="score">86%</span>
+                </div>
+                <div class="bar"><span style="width:86%"></span></div>
+                <ul class="evidence-list">
+                  <li>Auth failures rose from 3.1% to 11.7% after 09:12 ET.</li>
+                  <li>Impact concentrated in NA cards routed through Gateway B.</li>
+                  <li>Deployment log shows gateway config change 18 minutes earlier.</li>
+                </ul>
+              </div>
+
+              <div class="hypothesis">
+                <div class="hypothesis-head">
+                  <h3>Paid search campaign paused</h3>
+                  <span class="score">42%</span>
+                </div>
+                <div class="bar"><span style="width:42%; background: var(--amber)"></span></div>
+                <ul class="evidence-list">
+                  <li>Traffic fell in one channel but timing does not match full drop.</li>
+                </ul>
+              </div>
+
+              <div class="hypothesis">
+                <div class="hypothesis-head">
+                  <h3>Inventory constraints in top category</h3>
+                  <span class="score">24%</span>
+                </div>
+                <div class="bar"><span style="width:24%; background: var(--red)"></span></div>
+                <ul class="evidence-list">
+                  <li>Stockouts affected only 8% of the revenue variance.</li>
+                </ul>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="split">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Segment Impact</h2>
+                <span>Revenue variance by channel</span>
+              </div>
+            </div>
+            <div class="chart">
+              <div class="chart-bars" aria-label="Revenue variance bar chart">
+                <div class="bar-col"><span style="height:58%; background: var(--teal)"></span><b>Email</b></div>
+                <div class="bar-col"><span style="height:76%; background: var(--red)"></span><b>Direct</b></div>
+                <div class="bar-col"><span style="height:34%; background: var(--blue)"></span><b>Paid</b></div>
+                <div class="bar-col"><span style="height:88%; background: var(--red)"></span><b>Card</b></div>
+                <div class="bar-col"><span style="height:42%; background: var(--amber)"></span><b>Mobile</b></div>
+                <div class="bar-col"><span style="height:22%; background: var(--green)"></span><b>West</b></div>
+                <div class="bar-col"><span style="height:64%; background: var(--red)"></span><b>NA</b></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Auditable Summary</h2>
+                <span>Facts, inference, and next actions</span>
+              </div>
+            </div>
+            <div class="summary">
+              <div class="root-cause">
+                <strong>Likely root cause</strong>
+                Revenue dropped because Gateway B rejected a higher share of NA card authorizations after a routing configuration deployment.
+              </div>
+              <div class="actions">
+                <div class="action">
+                  <div class="priority">1</div>
+                  <div>
+                    <strong>Rollback Gateway B routing config</strong>
+                    <p>Estimated recoverable impact: $214K daily revenue.</p>
+                  </div>
+                  <button class="ghost-button">Create</button>
+                </div>
+                <div class="action">
+                  <div class="priority">2</div>
+                  <div>
+                    <strong>Notify support and finance</strong>
+                    <p>Attach affected segments, time window, and evidence links.</p>
+                  </div>
+                  <button class="ghost-button">Draft</button>
+                </div>
+                <div class="action">
+                  <div class="priority">3</div>
+                  <div>
+                    <strong>Add monitor for auth variance</strong>
+                    <p>Trigger investigation above 2.5 point movement by gateway.</p>
+                  </div>
+                  <button class="ghost-button">Add</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
