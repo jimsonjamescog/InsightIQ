@@ -390,7 +390,12 @@ class WarehouseToolProvider:
         )
 
     def calculate_business_impact(self, args: BusinessImpactInput) -> ToolResult:
-        sql = "SELECT metric_date, revenue FROM business.daily_revenue ORDER BY metric_date DESC"
+        sql = (
+            "SELECT a.metric_date, COALESCE(r.revenue, 0) AS revenue "
+            "FROM business.daily_actual_revenue a "
+            "LEFT JOIN business.daily_revenue r USING (metric_date) "
+            "ORDER BY a.metric_date DESC"
+        )
         rows = self.runner.query(sql)
         current_value = float(rows[0]["revenue"])
         expected_value = statistics.mean(float(row["revenue"]) for row in rows[1:29])

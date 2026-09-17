@@ -37,7 +37,7 @@ class DeterministicDecisionProvider(DecisionProvider):
     """Question-driven offline planner using context and registered capabilities."""
 
     def decide(self, state: InvestigationState, registry: ToolRegistry) -> AgentDecision:
-        self._expand_supported_follow_ups(state)
+        _expand_supported_follow_ups(state, registry)
         selection = self._select_next_requirement(state, registry)
         if selection:
             hypothesis, requirement, tool_name = selection
@@ -69,30 +69,6 @@ class DeterministicDecisionProvider(DecisionProvider):
             ),
             final_proposal=proposal,
         )
-
-    def _expand_supported_follow_ups(self, state: InvestigationState) -> None:
-        for hypothesis in list(state.hypotheses):
-            question = hypothesis.follow_up_question
-            if hypothesis.status != HypothesisStatus.SUPPORTED or not question:
-                continue
-            if question in state.follow_up_questions:
-                continue
-            state.follow_up_questions.append(question)
-            generated, requirements, _ = generate_hypotheses(
-                question,
-                start_number=len(state.hypotheses) + 1,
-                parent_id=hypothesis.hypothesis_id,
-            )
-            state.hypotheses.extend(generated)
-            state.evidence_requirements.update(requirements)
-            state.events.append(
-                _event(
-                    state,
-                    "FOLLOW_UP_CREATED",
-                    f"Created recursive investigation: {question}",
-                    hypothesis_id=hypothesis.hypothesis_id,
-                )
-            )
 
     @staticmethod
     def _select_next_requirement(state: InvestigationState, registry: ToolRegistry):
@@ -231,11 +207,18 @@ class DeterministicDecisionProvider(DecisionProvider):
 class OpenAIDecisionProvider(DecisionProvider):
     """Responses API planner constrained to discovered, allowlisted tools."""
 
-    def __init__(self, model: str, client: OpenAI | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        client: OpenAI | None = None,
+        *,
+        api_key: str | None = None,
+    ) -> None:
         self.model = model
-        self.client = client or OpenAI()
+        self.client = client or OpenAI(api_key=api_key)
 
     def decide(self, state: InvestigationState, registry: ToolRegistry) -> AgentDecision:
+        _expand_supported_follow_ups(state, registry)
         finish_tool = {
             "type": "function",
             "name": "finish_investigation",
@@ -243,6 +226,12 @@ class OpenAIDecisionProvider(DecisionProvider):
             "parameters": strict_json_schema(FinalProposal),
             "strict": True,
         }
+        unresolved_tools = _unresolved_tools(state, registry)
+        model_tools = [
+            tool for tool in registry.openai_tools() if tool["name"] in unresolved_tools
+        ]
+        if not model_tools:
+            model_tools = [finish_tool]
         response = self.client.responses.create(
             model=self.model,
             instructions=(
@@ -252,7 +241,7 @@ class OpenAIDecisionProvider(DecisionProvider):
                 "Use finish_investigation only for a traceable causal chain."
             ),
             input=json.dumps(_state_for_model(state, registry), default=str),
-            tools=[*registry.openai_tools(), finish_tool],
+            tools=model_tools,
             tool_choice="required",
             parallel_tool_calls=False,
             store=False,
@@ -268,22 +257,113 @@ class OpenAIDecisionProvider(DecisionProvider):
         call = calls[0]
         arguments: dict[str, Any] = json.loads(call.arguments)
         if call.name == "finish_investigation":
+            model_proposal = FinalProposal.model_validate(arguments)
+            proposal = DeterministicDecisionProvider._synthesize(state)
+            if proposal:
+                proposal.recommendation = model_proposal.recommendation
+            else:
+                proposal = model_proposal
             return AgentDecision(
                 reasoning_summary="The model proposed a final evidence-grounded conclusion.",
-                final_proposal=FinalProposal.model_validate(arguments),
+                final_proposal=proposal,
             )
         if call.name not in registry.names:
             raise RuntimeError(f"The model selected a non-allowlisted tool: {call.name}")
+        hypothesis, requirement = _requirement_for_tool(state, registry, call.name)
+        if requirement:
+            requirement.tool_name = call.name
         return AgentDecision(
             reasoning_summary=f"The model selected {call.name} for an unresolved evidence gap.",
             investigation_intent=InvestigationIntent(
-                question=state.question,
-                evidence_sought="Evidence selected by the model from current unresolved gaps.",
+                question=hypothesis.question if hypothesis else state.question,
+                hypothesis_id=hypothesis.hypothesis_id if hypothesis else None,
+                hypothesis=hypothesis.description if hypothesis else None,
+                evidence_sought=(
+                    requirement.description
+                    if requirement
+                    else "Evidence selected by the model from current unresolved gaps."
+                ),
                 selected_tool=call.name,
                 reason="The registered capability matches the model's current investigation plan.",
             ),
             tool_request=ToolRequest(name=call.name, arguments=arguments),
         )
+
+
+def _expand_supported_follow_ups(state: InvestigationState, registry: ToolRegistry) -> None:
+    for hypothesis in list(state.hypotheses):
+        question = hypothesis.follow_up_question
+        if hypothesis.status != HypothesisStatus.SUPPORTED or not question:
+            continue
+        if question in state.follow_up_questions:
+            continue
+        state.follow_up_questions.append(question)
+        generated, requirements, _ = generate_hypotheses(
+            question,
+            start_number=len(state.hypotheses) + 1,
+            parent_id=hypothesis.hypothesis_id,
+        )
+        completed_tools = {result.tool_name for result in state.tool_results}
+        for items in requirements.values():
+            for requirement in items:
+                definition = _definition_for_requirement(requirement, registry)
+                if definition in completed_tools:
+                    requirement.satisfied = True
+                    requirement.tool_name = definition
+        state.hypotheses.extend(generated)
+        state.evidence_requirements.update(requirements)
+        state.events.append(
+            _event(
+                state,
+                "FOLLOW_UP_CREATED",
+                f"Created recursive investigation: {question}",
+                hypothesis_id=hypothesis.hypothesis_id,
+            )
+        )
+
+
+def _definition_for_requirement(requirement, registry: ToolRegistry) -> str | None:
+    definition = registry.discover(requirement.capability)
+    return definition.name if definition else None
+
+
+def _unresolved_tools(state: InvestigationState, registry: ToolRegistry) -> set[str]:
+    names = set()
+    for owner_id, requirements in state.evidence_requirements.items():
+        hypothesis = next(
+            (item for item in state.hypotheses if item.hypothesis_id == owner_id), None
+        )
+        if hypothesis and hypothesis.status in {
+            HypothesisStatus.REJECTED,
+            HypothesisStatus.INSUFFICIENT_EVIDENCE,
+        }:
+            continue
+        for requirement in requirements:
+            if not requirement.satisfied and not requirement.unavailable:
+                name = _definition_for_requirement(requirement, registry)
+                if name:
+                    names.add(name)
+    return names
+
+
+def _requirement_for_tool(
+    state: InvestigationState,
+    registry: ToolRegistry,
+    tool_name: str,
+):
+    context = understand_question(state.question)
+    candidates = []
+    for owner_id, requirements in state.evidence_requirements.items():
+        hypothesis = next(
+            (item for item in state.hypotheses if item.hypothesis_id == owner_id), None
+        )
+        for requirement in requirements:
+            if requirement.satisfied or requirement.unavailable:
+                continue
+            definition = registry.discover(requirement.capability, context.domains)
+            if definition and definition.name == tool_name:
+                candidates.append((hypothesis, requirement))
+    return candidates[0] if candidates else (None, None)
 
 
 def _event(

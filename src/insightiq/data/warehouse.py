@@ -12,6 +12,7 @@ INCIDENT_DATE = "2026-09-14"
 
 class ScenarioName(StrEnum):
     BASE = "base"
+    CUSTOM_REGION_FAILURE = "custom_region_failure"
     MISSING_DEPLOYMENT = "missing_deployment"
     CONFLICTING_EVIDENCE = "conflicting_evidence"
     PAYMENT_FAILURE = "payment_failure"
@@ -278,6 +279,25 @@ INSERT INTO operations.documents VALUES
 """
 
 
+REBUILD_FACT_ORDERS = """
+CREATE OR REPLACE TABLE business.fct_orders AS
+SELECT
+    o.order_id,
+    o.customer_id,
+    o.order_date,
+    o.ordered_at,
+    o.channel,
+    o.order_status,
+    o.order_total,
+    d.customer_region,
+    p.category AS product_category
+FROM raw.orders o
+JOIN business.customer_dimension_snapshot d
+  ON d.customer_id = o.customer_id AND d.snapshot_date = o.order_date
+JOIN raw.order_items i ON i.order_id = o.order_id
+JOIN raw.products p ON p.product_id = i.product_id;
+"""
+
 REBUILD_ANALYTICS = """
 CREATE OR REPLACE TABLE business.daily_actual_revenue AS
 SELECT order_date AS metric_date, SUM(order_total)::DOUBLE AS revenue, COUNT(*) AS orders
@@ -323,6 +343,17 @@ SELECT DISTINCT payment_date, 'payment_status', 0.0, 1000 FROM raw.payments;
 
 def _apply_scenario(connection, scenario: ScenarioName) -> None:
     if scenario == ScenarioName.BASE:
+        return
+    if scenario == ScenarioName.CUSTOM_REGION_FAILURE:
+        connection.execute(
+            """
+            UPDATE business.customer_dimension_snapshot
+            SET customer_region = NULL
+            WHERE snapshot_date = DATE '2026-09-14'
+            """
+        )
+        connection.execute(REBUILD_FACT_ORDERS)
+        connection.execute(REBUILD_ANALYTICS)
         return
     if scenario == ScenarioName.MISSING_DEPLOYMENT:
         connection.execute("DELETE FROM operations.deployments WHERE deployment_id = 'deploy-284'")
@@ -432,12 +463,13 @@ def profile_warehouse(path: str | Path) -> WarehouseProfile:
                 (SELECT COUNT(*) FROM raw.customers),
                 (SELECT COUNT(*) FROM raw.orders),
                 (SELECT COUNT(*) FROM raw.products),
-                (SELECT revenue FROM business.daily_actual_revenue
-                 WHERE metric_date = DATE '2026-09-14'),
-                (SELECT revenue FROM business.daily_revenue
-                 WHERE metric_date = DATE '2026-09-14'),
-                (SELECT null_rate FROM quality.data_quality_metrics
-                 WHERE metric_date = DATE '2026-09-14' AND field_name = 'customer_region')
+                COALESCE((SELECT revenue FROM business.daily_actual_revenue
+                          WHERE metric_date = DATE '2026-09-14'), 0.0),
+                COALESCE((SELECT revenue FROM business.daily_revenue
+                          WHERE metric_date = DATE '2026-09-14'), 0.0),
+                COALESCE((SELECT null_rate FROM quality.data_quality_metrics
+                          WHERE metric_date = DATE '2026-09-14'
+                            AND field_name = 'customer_region'), 0.0)
             """
         ).fetchone()
     return WarehouseProfile(*row)
@@ -456,13 +488,20 @@ def validate_warehouse(
     expected_actual = 72000 if scenario == ScenarioName.PAYMENT_FAILURE else 120000
     if profile.incident_actual_revenue != expected_actual:
         errors.append(f"Incident actual revenue must be {expected_actual}.")
-    if profile.incident_reported_revenue != 72000:
-        errors.append("Incident reported revenue must be 72000.")
+    expected_reported_revenue = (
+        0.0
+        if scenario == ScenarioName.CUSTOM_REGION_FAILURE
+        else 72000
+    )
+    if profile.incident_reported_revenue != expected_reported_revenue:
+        errors.append(f"Incident reported revenue must be {expected_reported_revenue}.")
     expected_null_rate = (
         0.0
         if scenario == ScenarioName.PAYMENT_FAILURE
         else 0.004
         if scenario in {ScenarioName.CONFLICTING_EVIDENCE, ScenarioName.INSUFFICIENT_EVIDENCE}
+        else 1.0
+        if scenario == ScenarioName.CUSTOM_REGION_FAILURE
         else 0.631
     )
     if round(profile.incident_region_null_rate, 3) != expected_null_rate:

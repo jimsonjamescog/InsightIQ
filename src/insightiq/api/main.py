@@ -29,7 +29,12 @@ registry = build_registry(settings)
 
 def build_provider():
     if settings.agent_mode == "openai":
-        return OpenAIDecisionProvider(settings.openai_model)
+        if settings.openai_api_key is None:
+            raise RuntimeError("OPENAI_API_KEY is required when INSIGHTIQ_AGENT_MODE=openai.")
+        return OpenAIDecisionProvider(
+            settings.openai_model,
+            api_key=settings.openai_api_key.get_secret_value(),
+        )
     return DeterministicDecisionProvider()
 
 

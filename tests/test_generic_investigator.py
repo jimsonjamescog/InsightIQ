@@ -28,6 +28,32 @@ def test_revenue_question_generates_and_investigates_dynamic_hypotheses():
     assert any(item.event_type == "EVIDENCE_SEEKING" for item in report.events)
 
 
+def test_open_ended_business_question_investigates_measurable_causes():
+    state, _ = investigate("Why did our business performance change yesterday?")
+    types = {item.hypothesis_type for item in state.hypotheses}
+
+    assert {"demand_decline", "pricing_issue", "payment_failure", "data_quality_failure"} <= types
+    assert "known_incident" not in types
+    assert any(
+        item.tool_name == "compare_periods" and item.arguments.get("metric") == "revenue"
+        for item in state.tool_results
+    )
+
+
+def test_open_ended_root_cause_prompt_investigates_measurable_causes():
+    state, _ = investigate(
+        "Investigate what changed in the business yesterday, determine the most likely "
+        "root cause, and estimate its financial impact."
+    )
+
+    assert {item.hypothesis_type for item in state.hypotheses} >= {
+        "demand_decline",
+        "pricing_issue",
+        "payment_failure",
+        "data_quality_failure",
+    }
+
+
 def test_regional_order_question_follows_a_different_path():
     state, _ = investigate("Why did Northeast order volume fall yesterday?")
     types = {item.hypothesis_type for item in state.hypotheses}
@@ -40,6 +66,19 @@ def test_regional_order_question_follows_a_different_path():
         {"metric": "orders", "current_period": "yesterday", "baseline_period": "previous_28_days"},
     ) in calls
     assert any(name == "segment_metric" and args["metric"] == "orders" for name, args in calls)
+
+
+def test_regional_revenue_question_segments_revenue():
+    state, _ = investigate("Which region had the lost revenue yesterday?")
+    types = {item.hypothesis_type for item in state.hypotheses}
+
+    assert "regional_pattern" in types
+    assert any(
+        item.tool_name == "segment_metric"
+        and item.arguments["metric"] == "revenue"
+        and item.arguments["dimension"] == "region"
+        for item in state.tool_results
+    )
 
 
 def test_data_completeness_question_uses_operational_evidence():
