@@ -1,0 +1,22 @@
+[
+  {"record_id":"sample-01","question":"Why did reported revenue decrease yesterday?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-02","question":"Why did revenue drop yesterday?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-03","question":"What caused yesterday's revenue decline?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-04","question":"Why is reported revenue below baseline?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-05","question":"Explain the revenue decrease for the latest day.","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-06","question":"What caused the sudden revenue anomaly?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-07","question":"Why did daily revenue fall?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-08","question":"Investigate the latest revenue shortfall.","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-09","question":"Why did Northeast order volume fall yesterday?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-10","question":"What caused the regional order decline?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-11","question":"Why are yesterday's orders below baseline?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-12","question":"Why did order volume decrease?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-13","question":"Why did customer region data become incomplete?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-14","question":"Why did customer region completeness deteriorate?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-15","question":"What caused null values in customer region?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-16","question":"What caused the customer region data quality failure?","expected_outcome":"ROOT_CAUSE_ESTABLISHED"},
+  {"record_id":"sample-17","question":"Why did employee happiness change?","expected_outcome":"INSUFFICIENT_EVIDENCE"},
+  {"record_id":"sample-18","question":"Why did brand awareness shift?","expected_outcome":"INSUFFICIENT_EVIDENCE"},
+  {"record_id":"sample-19","question":"Why did office temperature change?","expected_outcome":"INSUFFICIENT_EVIDENCE"},
+  {"record_id":"sample-20","question":"What changed customer sentiment this week?","expected_outcome":"INSUFFICIENT_EVIDENCE"}
+]

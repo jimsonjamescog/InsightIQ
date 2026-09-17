@@ -138,6 +138,85 @@ curl -X POST http://localhost:8000/investigations \
   -d '{"question":"Why did revenue decrease yesterday?"}'
 ```
 
+Representative response (IDs vary by run):
+
+```json
+{
+  "investigation_id": "inv-a1b2c3d4e5f6",
+  "question": "Why did revenue decrease yesterday?",
+  "conclusions": [
+    "Evidence establishes that a deployment defect changed the customer-region transformation."
+  ],
+  "root_cause_chain": [
+    {
+      "link_id": "link-1",
+      "sequence": 1,
+      "statement": "A deployment changed the customer-region transformation.",
+      "classification": "OBSERVED",
+      "evidence_ids": ["ev-example-1"]
+    },
+    {
+      "link_id": "link-2",
+      "sequence": 2,
+      "statement": "The collected evidence supports the identified deployment defect.",
+      "classification": "INFERRED",
+      "evidence_ids": ["ev-example-1", "ev-example-2"]
+    }
+  ],
+  "business_impact": {
+    "reported_value": 72000.0,
+    "expected_value": 120000.0,
+    "understatement": 48000.0,
+    "understatement_percent": 40.0,
+    "unit": "USD"
+  },
+  "confidence": {
+    "evidence_strength": 0.95,
+    "coverage": 1.0,
+    "consistency": 1.0,
+    "overall": 0.98
+  },
+  "evidence_gate": {
+    "passed": true,
+    "confidence": 0.98,
+    "reasons": [
+      "Confidence meets the configured threshold.",
+      "Multiple observed evidence items support the conclusion.",
+      "All observed evidence has valid tool provenance.",
+      "The causal chain and business impact are complete."
+    ],
+    "missing_evidence": []
+  },
+  "outcome": "ROOT_CAUSE_ESTABLISHED",
+  "recommendation": "Correct the supported failure, backfill affected data, rerun dependent models, and add a preventive quality gate."
+}
+```
+
+The actual response also includes the complete observations, hypotheses, rejected hypotheses,
+evidence records, follow-up questions, event stream, and execution statistics defined in the
+interactive OpenAPI schema at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+## Postman and sample dataset
+
+Import `postman/InsightIQ.postman_collection.json` into Postman after starting the API. The
+collection includes health, tool-contract, synchronous investigation, background investigation,
+provenance, report-retrieval, and error-contract checks with automated assertions. The optional
+`postman/InsightIQ.local.postman_environment.json` file supplies the local base URL.
+
+The file `sample-data/investigation_requests.json` contains exactly 20 mock investigation records.
+Run every record against the endpoint with Newman:
+
+```bash
+npx newman run postman/InsightIQ.postman_collection.json \
+  --environment postman/InsightIQ.local.postman_environment.json \
+  --folder "Synchronous investigation workflow" \
+  --iteration-data sample-data/investigation_requests.json
+```
+
+Each record supplies a question and expected outcome. Positive revenue, order, and data-quality
+questions must establish a supported root cause; deliberately unsupported questions must return
+`INSUFFICIENT_EVIDENCE`.
+
 ## Architecture
 
 ```text
@@ -195,7 +274,7 @@ The injected scenario preserves actual revenue at `$120,000` while a customer-re
 See [`docs/data-engineering.md`](docs/data-engineering.md) for ownership, contracts, warehouse setup, and Snowflake instructions.
 See [`docs/generic-investigator.md`](docs/generic-investigator.md) for planning, recursion,
 tool discovery, live progress, and the implementation freeze.
-See [`docs/architecture.md`](docs/architecture.md) for the system architecture diagram.
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the legacy-to-REST comparison and current system diagram.
 See [`docs/plan.md`](docs/plan.md) for phased milestones and definition-of-done checks.
 See [`docs/prompts.md`](docs/prompts.md) for significant prompts, responses, and refinements.
 
